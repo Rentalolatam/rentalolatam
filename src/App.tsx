@@ -1,21 +1,59 @@
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Link, useNavigate } from 'react-router-dom'
+import { AuthProvider, useAuth } from './context/AuthContext'
+import ProtectedRoute from './components/ProtectedRoute'
+import Navbar from './components/Navbar'
 import Propiedades from './pages/Propiedades'
 import NuevaPropiedad from './pages/NuevaPropiedad'
+import Login from './pages/Login'
+import Registro from './pages/Registro'
 
 function LandingPage() {
+  const { usuario, logout } = useAuth()
+  const navigate = useNavigate()
+
+  const handleLogout = async () => {
+    await logout()
+    navigate('/')
+  }
+
   return (
     <div style={{ fontFamily: 'Arial, sans-serif', margin: 0, padding: 0 }}>
 
-      {/* NAVBAR */}
+      {/* NAVBAR con links extra de la landing */}
       <nav style={{ backgroundColor: '#1B3A5C', padding: '16px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Link to="/" style={{ color: 'white', fontSize: '22px', fontWeight: 'bold', textDecoration: 'none' }}>
           Rentalo<span style={{ color: '#52B788' }}>Latam</span>
         </Link>
-        <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
           <Link to="/propiedades" style={{ color: 'white', textDecoration: 'none', fontSize: '14px' }}>Propiedades</Link>
           <a href="#propietarios" style={{ color: 'white', textDecoration: 'none', fontSize: '14px' }}>Para propietarios</a>
           <a href="#footer" style={{ color: 'white', textDecoration: 'none', fontSize: '14px' }}>Contacto</a>
-          <Link to="/propiedades/nueva" style={{ backgroundColor: '#52B788', color: 'white', padding: '8px 20px', borderRadius: '6px', textDecoration: 'none', fontSize: '14px', fontWeight: 'bold' }}>Publicar propiedad</Link>
+
+          {usuario ? (
+            <>
+              <span style={{ color: 'white', fontSize: '14px' }}>{usuario.nombre}</span>
+              <span style={{
+                fontSize: '11px', fontWeight: 'bold', padding: '2px 8px', borderRadius: '999px',
+                backgroundColor: usuario.tipo === 'Propietario' ? '#EBF8FF' : '#F0FFF4',
+                color: usuario.tipo === 'Propietario' ? '#2B6CB0' : '#2D6A4F',
+              }}>
+                {usuario.tipo}
+              </span>
+              <button
+                onClick={handleLogout}
+                style={{ backgroundColor: 'transparent', color: '#CBD5E0', border: '1px solid #CBD5E0', padding: '6px 16px', borderRadius: '6px', fontSize: '13px', cursor: 'pointer' }}
+              >
+                Cerrar sesión
+              </button>
+            </>
+          ) : (
+            <>
+              <Link to="/login" style={{ color: 'white', textDecoration: 'none', fontSize: '14px' }}>Iniciar sesión</Link>
+              <Link to="/propiedades/nueva" style={{ backgroundColor: '#52B788', color: 'white', padding: '8px 20px', borderRadius: '6px', textDecoration: 'none', fontSize: '14px', fontWeight: 'bold' }}>
+                Publicar propiedad
+              </Link>
+            </>
+          )}
         </div>
       </nav>
 
@@ -132,13 +170,26 @@ function LandingPage() {
 function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/propiedades" element={<Propiedades />} />
-        <Route path="/propiedades/nueva" element={<NuevaPropiedad />} />
-      </Routes>
+      <AuthProvider>
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/propiedades" element={<Propiedades />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/registro" element={<Registro />} />
+          <Route
+            path="/propiedades/nueva"
+            element={
+              <ProtectedRoute>
+                <NuevaPropiedad />
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+      </AuthProvider>
     </BrowserRouter>
   )
 }
 
+// Navbar se exporta por si se necesita fuera, pero no se usa directamente en App
+export { Navbar }
 export default App
