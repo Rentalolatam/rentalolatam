@@ -25,5 +25,6 @@ export type Propiedad = {
   descripcion: string | null
   fotos: string[]
   estado: 'disponible' | 'arrendado' | 'en mantenimiento'
+  publicado_por: string | null
   created_at: string
 }

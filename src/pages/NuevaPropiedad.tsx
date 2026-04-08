@@ -1,6 +1,8 @@
 import { useState, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import Navbar from '../components/Navbar'
+import { useAuth } from '../context/AuthContext'
 
 const TIPO_CAMBIO = 7.75
 
@@ -46,6 +48,7 @@ const initialForm: FormData = {
 
 export default function NuevaPropiedad() {
   const navigate = useNavigate()
+  const { usuario } = useAuth()
   const [form, setForm] = useState<FormData>(initialForm)
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -120,6 +123,7 @@ export default function NuevaPropiedad() {
       descripcion: form.descripcion || null,
       fotos: fotosValidas,
       estado: form.estado,
+      publicado_por: usuario?.id ?? null,
     })
 
     setEnviando(false)
@@ -134,16 +138,7 @@ export default function NuevaPropiedad() {
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#F8F9FA', fontFamily: 'Arial, sans-serif' }}>
-      {/* NAVBAR */}
-      <nav style={{ backgroundColor: '#1B3A5C', padding: '16px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Link to="/" style={{ color: 'white', fontSize: '22px', fontWeight: 'bold', textDecoration: 'none' }}>
-          Rentalo<span style={{ color: '#52B788' }}>Latam</span>
-        </Link>
-        <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
-          <Link to="/propiedades" style={{ color: 'white', textDecoration: 'none', fontSize: '14px' }}>Propiedades</Link>
-          <Link to="/propiedades/nueva" style={{ backgroundColor: '#52B788', color: 'white', padding: '8px 20px', borderRadius: '6px', textDecoration: 'none', fontSize: '14px', fontWeight: 'bold' }}>Publicar propiedad</Link>
-        </div>
-      </nav>
+      <Navbar />
 
       <div className="max-w-3xl mx-auto py-10 px-4">
         <div className="mb-8">

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase, type Propiedad } from '../lib/supabase'
+import Navbar from '../components/Navbar'
 
 const ESTADO_BADGE: Record<string, { label: string; bg: string; color: string }> = {
   disponible: { label: 'Disponible', bg: '#F0FFF4', color: '#2D6A4F' },
@@ -33,16 +34,7 @@ export default function Propiedades() {
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#F8F9FA', fontFamily: 'Arial, sans-serif' }}>
-      {/* NAVBAR */}
-      <nav style={{ backgroundColor: '#1B3A5C', padding: '16px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Link to="/" style={{ color: 'white', fontSize: '22px', fontWeight: 'bold', textDecoration: 'none' }}>
-          Rentalo<span style={{ color: '#52B788' }}>Latam</span>
-        </Link>
-        <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
-          <Link to="/propiedades" style={{ color: '#52B788', textDecoration: 'none', fontSize: '14px', fontWeight: 'bold' }}>Propiedades</Link>
-          <Link to="/propiedades/nueva" style={{ backgroundColor: '#52B788', color: 'white', padding: '8px 20px', borderRadius: '6px', textDecoration: 'none', fontSize: '14px', fontWeight: 'bold' }}>Publicar propiedad</Link>
-        </div>
-      </nav>
+      <Navbar />
 
       {/* HEADER */}
       <div style={{ backgroundColor: '#1B3A5C', padding: '48px 40px 40px' }}>
