@@ -1,17 +1,21 @@
-function App() {
+import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'
+import Propiedades from './pages/Propiedades'
+import NuevaPropiedad from './pages/NuevaPropiedad'
+
+function LandingPage() {
   return (
     <div style={{ fontFamily: 'Arial, sans-serif', margin: 0, padding: 0 }}>
-      
+
       {/* NAVBAR */}
       <nav style={{ backgroundColor: '#1B3A5C', padding: '16px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ color: 'white', fontSize: '22px', fontWeight: 'bold' }}>
+        <Link to="/" style={{ color: 'white', fontSize: '22px', fontWeight: 'bold', textDecoration: 'none' }}>
           Rentalo<span style={{ color: '#52B788' }}>Latam</span>
-        </div>
-        <div style={{ display: 'flex', gap: '24px' }}>
-          <a href="#" style={{ color: 'white', textDecoration: 'none', fontSize: '14px' }}>Propiedades</a>
-          <a href="#" style={{ color: 'white', textDecoration: 'none', fontSize: '14px' }}>Para propietarios</a>
-          <a href="#" style={{ color: 'white', textDecoration: 'none', fontSize: '14px' }}>Contacto</a>
-          <a href="#" style={{ backgroundColor: '#52B788', color: 'white', padding: '8px 20px', borderRadius: '6px', textDecoration: 'none', fontSize: '14px', fontWeight: 'bold' }}>Publicar propiedad</a>
+        </Link>
+        <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
+          <Link to="/propiedades" style={{ color: 'white', textDecoration: 'none', fontSize: '14px' }}>Propiedades</Link>
+          <a href="#propietarios" style={{ color: 'white', textDecoration: 'none', fontSize: '14px' }}>Para propietarios</a>
+          <a href="#footer" style={{ color: 'white', textDecoration: 'none', fontSize: '14px' }}>Contacto</a>
+          <Link to="/propiedades/nueva" style={{ backgroundColor: '#52B788', color: 'white', padding: '8px 20px', borderRadius: '6px', textDecoration: 'none', fontSize: '14px', fontWeight: 'bold' }}>Publicar propiedad</Link>
         </div>
       </nav>
 
@@ -24,8 +28,8 @@ function App() {
           La plataforma de rentas más completa de la región. Propiedades verificadas, contratos digitales y pagos seguros.
         </p>
         <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', flexWrap: 'wrap' }}>
-          <input 
-            placeholder="Zona, colonia o ciudad..." 
+          <input
+            placeholder="Zona, colonia o ciudad..."
             style={{ padding: '14px 20px', borderRadius: '8px', border: 'none', width: '320px', fontSize: '15px' }}
           />
           <select style={{ padding: '14px 20px', borderRadius: '8px', border: 'none', fontSize: '15px', color: '#666' }}>
@@ -35,7 +39,10 @@ function App() {
             <option>Costa Rica</option>
             <option>Panamá</option>
           </select>
-          <button style={{ backgroundColor: '#52B788', color: 'white', padding: '14px 32px', borderRadius: '8px', border: 'none', fontSize: '15px', fontWeight: 'bold', cursor: 'pointer' }}>
+          <button
+            style={{ backgroundColor: '#52B788', color: 'white', padding: '14px 32px', borderRadius: '8px', border: 'none', fontSize: '15px', fontWeight: 'bold', cursor: 'pointer' }}
+            onClick={() => window.location.href = '/propiedades'}
+          >
             Buscar
           </button>
         </div>
@@ -71,34 +78,46 @@ function App() {
                 <div style={{ color: '#666', fontSize: '13px', marginBottom: '12px' }}>{p.hab}</div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ color: '#1B3A5C', fontSize: '18px', fontWeight: 'bold' }}>{p.precio}</span>
-                  <button style={{ backgroundColor: '#1B3A5C', color: 'white', padding: '8px 16px', borderRadius: '6px', border: 'none', fontSize: '13px', cursor: 'pointer' }}>Ver más</button>
+                  <Link to="/propiedades" style={{ backgroundColor: '#1B3A5C', color: 'white', padding: '8px 16px', borderRadius: '6px', fontSize: '13px', textDecoration: 'none' }}>Ver más</Link>
                 </div>
               </div>
             </div>
           ))}
         </div>
+        <div style={{ textAlign: 'center', marginTop: '40px' }}>
+          <Link to="/propiedades" style={{ backgroundColor: '#1B3A5C', color: 'white', padding: '12px 32px', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', textDecoration: 'none' }}>
+            Ver todas las propiedades
+          </Link>
+        </div>
       </div>
 
       {/* PARA PROPIETARIOS */}
-      <div style={{ padding: '64px 40px', backgroundColor: 'white', textAlign: 'center' }}>
+      <div id="propietarios" style={{ padding: '64px 40px', backgroundColor: 'white', textAlign: 'center' }}>
         <h2 style={{ color: '#1B3A5C', fontSize: '32px', marginBottom: '8px' }}>¿Tenés una propiedad para rentar?</h2>
         <p style={{ color: '#666', fontSize: '16px', marginBottom: '40px' }}>Publicá gratis y llegá a miles de inquilinos verificados en toda Centroamérica</p>
         <div style={{ display: 'flex', justifyContent: 'center', gap: '40px', flexWrap: 'wrap', marginBottom: '40px' }}>
-          {[['📋', 'Contratos digitales', 'Generamos el contrato automáticamente y lo firmamos en línea'], ['💳', 'Cobros seguros', 'Recibís el pago directo en tu cuenta cada mes'], ['📊', 'Dashboard completo', 'Controlá tus propiedades, inquilinos y pagos desde un solo lugar']].map(([icon, title, desc]) => (
-            <div key={title} style={{ maxWidth: '220px' }}>
+          {[
+            ['📋', 'Contratos digitales', 'Generamos el contrato automáticamente y lo firmamos en línea'],
+            ['💳', 'Cobros seguros', 'Recibís el pago directo en tu cuenta cada mes'],
+            ['📊', 'Dashboard completo', 'Controlá tus propiedades, inquilinos y pagos desde un solo lugar'],
+          ].map(([icon, title, desc]) => (
+            <div key={title as string} style={{ maxWidth: '220px' }}>
               <div style={{ fontSize: '36px', marginBottom: '12px' }}>{icon}</div>
               <div style={{ color: '#1B3A5C', fontSize: '16px', fontWeight: 'bold', marginBottom: '8px' }}>{title}</div>
               <div style={{ color: '#666', fontSize: '14px' }}>{desc}</div>
             </div>
           ))}
         </div>
-        <button style={{ backgroundColor: '#52B788', color: 'white', padding: '14px 40px', borderRadius: '8px', border: 'none', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' }}>
+        <Link
+          to="/propiedades/nueva"
+          style={{ backgroundColor: '#52B788', color: 'white', padding: '14px 40px', borderRadius: '8px', fontSize: '16px', fontWeight: 'bold', textDecoration: 'none', display: 'inline-block' }}
+        >
           Publicar mi propiedad
-        </button>
+        </Link>
       </div>
 
       {/* FOOTER */}
-      <footer style={{ backgroundColor: '#1B3A5C', padding: '40px', textAlign: 'center' }}>
+      <footer id="footer" style={{ backgroundColor: '#1B3A5C', padding: '40px', textAlign: 'center' }}>
         <div style={{ color: 'white', fontSize: '20px', fontWeight: 'bold', marginBottom: '8px' }}>
           Rentalo<span style={{ color: '#52B788' }}>Latam</span>
         </div>
@@ -107,6 +126,18 @@ function App() {
       </footer>
 
     </div>
+  )
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/propiedades" element={<Propiedades />} />
+        <Route path="/propiedades/nueva" element={<NuevaPropiedad />} />
+      </Routes>
+    </BrowserRouter>
   )
 }
 
