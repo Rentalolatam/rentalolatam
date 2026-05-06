@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { supabase, type Propiedad } from '../lib/supabase'
 import Navbar from '../components/Navbar'
 
@@ -101,11 +101,18 @@ export default function Propiedades() {
 }
 
 function PropiedadCard({ propiedad: p }: { propiedad: Propiedad }) {
+  const navigate = useNavigate()
   const badge = ESTADO_BADGE[p.estado] ?? ESTADO_BADGE['disponible']
   const fotoUrl = p.fotos?.[0]
 
   return (
-    <div className="bg-white rounded-xl overflow-hidden" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+    <div
+      className="bg-white rounded-xl overflow-hidden"
+      style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.1)', cursor: 'pointer', transition: 'transform 0.15s, box-shadow 0.15s' }}
+      onClick={() => { console.log('click propiedad:', p.id); navigate(`/propiedades/${p.id}`) }}
+      onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-3px)'; (e.currentTarget as HTMLDivElement).style.boxShadow = '0 6px 20px rgba(0,0,0,0.13)' }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.transform = ''; (e.currentTarget as HTMLDivElement).style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)' }}
+    >
       {/* Imagen */}
       <div className="relative" style={{ height: '200px', backgroundColor: '#CBD5E0' }}>
         {fotoUrl ? (
@@ -125,14 +132,14 @@ function PropiedadCard({ propiedad: p }: { propiedad: Propiedad }) {
         {/* Badge tipo */}
         <span
           className="absolute top-3 left-3 text-xs font-bold px-2 py-1 rounded"
-          style={{ backgroundColor: '#1B3A5C', color: 'white' }}
+          style={{ backgroundColor: '#1B3A5C', color: 'white', pointerEvents: 'none' }}
         >
           {p.tipo}
         </span>
         {/* Badge estado */}
         <span
           className="absolute top-3 right-3 text-xs font-semibold px-2 py-1 rounded"
-          style={{ backgroundColor: badge.bg, color: badge.color }}
+          style={{ backgroundColor: badge.bg, color: badge.color, pointerEvents: 'none' }}
         >
           {badge.label}
         </span>
@@ -178,6 +185,9 @@ function PropiedadCard({ propiedad: p }: { propiedad: Propiedad }) {
               ≈ ${p.precio_dolares.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
             </div>
           </div>
+          <span className="text-xs font-bold px-3 py-1.5 rounded-lg" style={{ backgroundColor: '#F0FFF4', color: '#2D6A4F' }}>
+            Ver detalle →
+          </span>
         </div>
       </div>
     </div>

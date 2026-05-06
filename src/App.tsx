@@ -4,6 +4,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import Navbar from './components/Navbar'
 import Propiedades from './pages/Propiedades'
 import NuevaPropiedad from './pages/NuevaPropiedad'
+import DetallePropiedad from './pages/DetallePropiedad'
 import Login from './pages/Login'
 import Registro from './pages/Registro'
 
@@ -174,6 +175,7 @@ function App() {
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/propiedades" element={<Propiedades />} />
+          <Route path="/propiedades/:id" element={<DetallePropiedad />} />
           <Route path="/login" element={<Login />} />
           <Route path="/registro" element={<Registro />} />
           <Route
