@@ -109,7 +109,7 @@ function PropiedadCard({ propiedad: p }: { propiedad: Propiedad }) {
     <div
       className="bg-white rounded-xl overflow-hidden"
       style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.1)', cursor: 'pointer', transition: 'transform 0.15s, box-shadow 0.15s' }}
-      onClick={() => navigate(`/propiedades/${p.id}`)}
+      onClick={() => { console.log('click propiedad:', p.id); navigate(`/propiedades/${p.id}`) }}
       onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-3px)'; (e.currentTarget as HTMLDivElement).style.boxShadow = '0 6px 20px rgba(0,0,0,0.13)' }}
       onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.transform = ''; (e.currentTarget as HTMLDivElement).style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)' }}
     >
@@ -132,14 +132,14 @@ function PropiedadCard({ propiedad: p }: { propiedad: Propiedad }) {
         {/* Badge tipo */}
         <span
           className="absolute top-3 left-3 text-xs font-bold px-2 py-1 rounded"
-          style={{ backgroundColor: '#1B3A5C', color: 'white' }}
+          style={{ backgroundColor: '#1B3A5C', color: 'white', pointerEvents: 'none' }}
         >
           {p.tipo}
         </span>
         {/* Badge estado */}
         <span
           className="absolute top-3 right-3 text-xs font-semibold px-2 py-1 rounded"
-          style={{ backgroundColor: badge.bg, color: badge.color }}
+          style={{ backgroundColor: badge.bg, color: badge.color, pointerEvents: 'none' }}
         >
           {badge.label}
         </span>
