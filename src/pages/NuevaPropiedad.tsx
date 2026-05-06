@@ -1,10 +1,13 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import Navbar from '../components/Navbar'
 import { useAuth } from '../context/AuthContext'
 
 const TIPO_CAMBIO = 7.75
+const MIN_FOTOS = 3
+const MAX_FOTOS = 10
+const BUCKET = 'propiedades-fotos'
 
 type FormData = {
   titulo: string
@@ -22,8 +25,12 @@ type FormData = {
   metraje_sin_parqueo: string
   metraje_con_parqueo: string
   descripcion: string
-  fotos: string[]
   estado: string
+}
+
+type FotoLocal = {
+  file: File
+  previewUrl: string
 }
 
 const initialForm: FormData = {
@@ -42,68 +49,100 @@ const initialForm: FormData = {
   metraje_sin_parqueo: '',
   metraje_con_parqueo: '',
   descripcion: '',
-  fotos: ['', '', ''],
   estado: 'disponible',
 }
 
 export default function NuevaPropiedad() {
   const navigate = useNavigate()
   const { usuario } = useAuth()
+  const inputFileRef = useRef<HTMLInputElement>(null)
+
   const [form, setForm] = useState<FormData>(initialForm)
+  const [fotos, setFotos] = useState<FotoLocal[]>([])
   const [enviando, setEnviando] = useState(false)
+  const [progreso, setProgreso] = useState<{ actual: number; total: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const precioDolares =
-    form.precio_quetzales
-      ? (parseFloat(form.precio_quetzales) / TIPO_CAMBIO).toFixed(2)
-      : ''
+  const precioDolares = form.precio_quetzales
+    ? (parseFloat(form.precio_quetzales) / TIPO_CAMBIO).toFixed(2)
+    : ''
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
       const { name, value, type } = e.target
       const checked = (e.target as HTMLInputElement).checked
-      setForm((prev) => ({
-        ...prev,
-        [name]: type === 'checkbox' ? checked : value,
-      }))
+      setForm((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }))
     },
     []
   )
 
-  const handleFotoChange = (index: number, value: string) => {
-    setForm((prev) => {
-      const fotos = [...prev.fotos]
-      fotos[index] = value
-      return { ...prev, fotos }
-    })
-  }
+  const handleSeleccionarArchivos = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const archivos = Array.from(e.target.files ?? [])
+    if (!archivos.length) return
 
-  const agregarFoto = () => {
-    if (form.fotos.length < 10) {
-      setForm((prev) => ({ ...prev, fotos: [...prev.fotos, ''] }))
-    }
+    const nuevas: FotoLocal[] = archivos.map((file) => ({
+      file,
+      previewUrl: URL.createObjectURL(file),
+    }))
+
+    setFotos((prev) => {
+      // Liberar URLs anteriores que queden fuera del límite
+      const combinadas = [...prev, ...nuevas].slice(0, MAX_FOTOS)
+      return combinadas
+    })
+
+    // Limpiar el input para permitir re-selección del mismo archivo
+    e.target.value = ''
   }
 
   const quitarFoto = (index: number) => {
-    if (form.fotos.length > 3) {
-      setForm((prev) => {
-        const fotos = prev.fotos.filter((_, i) => i !== index)
-        return { ...prev, fotos }
-      })
-    }
+    setFotos((prev) => {
+      URL.revokeObjectURL(prev[index].previewUrl)
+      return prev.filter((_, i) => i !== index)
+    })
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
 
-    const fotosValidas = form.fotos.filter((f) => f.trim() !== '')
-    if (fotosValidas.length < 3) {
-      setError('Debés ingresar al menos 3 URLs de fotos.')
+    if (fotos.length < MIN_FOTOS) {
+      setError(`Debés seleccionar al menos ${MIN_FOTOS} fotos.`)
       return
     }
 
     setEnviando(true)
+    setProgreso({ actual: 0, total: fotos.length })
+
+    // Subir fotos a Supabase Storage
+    const fotosUrls: string[] = []
+    const userId = usuario?.id ?? 'anonimo'
+
+    for (let i = 0; i < fotos.length; i++) {
+      const { file } = fotos[i]
+      const ext = file.name.split('.').pop() ?? 'jpg'
+      const path = `${userId}/${Date.now()}_${i}.${ext}`
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from(BUCKET)
+        .upload(path, file, { upsert: false })
+
+      if (uploadError) {
+        setError(`Error subiendo foto ${i + 1}: ${uploadError.message}`)
+        setEnviando(false)
+        setProgreso(null)
+        return
+      }
+
+      const { data: urlData } = supabase.storage
+        .from(BUCKET)
+        .getPublicUrl(uploadData.path)
+
+      fotosUrls.push(urlData.publicUrl)
+      setProgreso({ actual: i + 1, total: fotos.length })
+    }
+
+    // Guardar en base de datos
     const { error: sbError } = await supabase.from('propiedades').insert({
       titulo: form.titulo,
       tipo: form.tipo,
@@ -121,12 +160,13 @@ export default function NuevaPropiedad() {
       metraje_sin_parqueo: form.metraje_sin_parqueo ? parseFloat(form.metraje_sin_parqueo) : null,
       metraje_con_parqueo: form.metraje_con_parqueo ? parseFloat(form.metraje_con_parqueo) : null,
       descripcion: form.descripcion || null,
-      fotos: fotosValidas,
+      fotos: fotosUrls,
       estado: form.estado,
       publicado_por: usuario?.id ?? null,
     })
 
     setEnviando(false)
+    setProgreso(null)
 
     if (sbError) {
       setError(`Error al guardar: ${sbError.message}`)
@@ -135,6 +175,8 @@ export default function NuevaPropiedad() {
 
     navigate('/propiedades')
   }
+
+  const porcentaje = progreso ? Math.round((progreso.actual / progreso.total) * 100) : 0
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#F8F9FA', fontFamily: 'Arial, sans-serif' }}>
@@ -441,43 +483,118 @@ export default function NuevaPropiedad() {
           {/* Fotos */}
           <section className="bg-white rounded-xl shadow-sm p-6">
             <h2 className="text-lg font-semibold mb-1" style={{ color: '#1B3A5C' }}>Fotos</h2>
-            <p className="text-xs mb-4" style={{ color: '#666' }}>
-              Ingresá las URLs de las fotos de tu propiedad. Mínimo 3, máximo 10.
+            <p className="text-xs mb-5" style={{ color: '#666' }}>
+              Seleccioná entre {MIN_FOTOS} y {MAX_FOTOS} fotos desde tu computadora. Se subirán a Supabase Storage al publicar.
             </p>
-            <div className="space-y-3">
-              {form.fotos.map((url, i) => (
-                <div key={i} className="flex gap-2 items-center">
-                  <span className="text-sm w-6 text-right shrink-0" style={{ color: '#999' }}>{i + 1}.</span>
-                  <input
-                    type="url"
-                    value={url}
-                    onChange={(e) => handleFotoChange(i, e.target.value)}
-                    placeholder="https://ejemplo.com/foto.jpg"
-                    className="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none"
-                    style={{ borderColor: '#CBD5E0' }}
-                  />
-                  {form.fotos.length > 3 && (
+
+            {/* Zona de drop / selección */}
+            {fotos.length < MAX_FOTOS && (
+              <>
+                <input
+                  ref={inputFileRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleSeleccionarArchivos}
+                  style={{ display: 'none' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => inputFileRef.current?.click()}
+                  className="w-full border-2 border-dashed rounded-xl py-8 flex flex-col items-center gap-2 transition-colors"
+                  style={{
+                    borderColor: '#CBD5E0',
+                    backgroundColor: '#FAFAFA',
+                    cursor: 'pointer',
+                    color: '#666',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#52B788')}
+                  onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#CBD5E0')}
+                >
+                  <span style={{ fontSize: '32px' }}>📷</span>
+                  <span className="text-sm font-medium">Hacé click para seleccionar fotos</span>
+                  <span className="text-xs" style={{ color: '#999' }}>
+                    JPG, PNG, WEBP — {fotos.length}/{MAX_FOTOS} seleccionadas
+                  </span>
+                </button>
+              </>
+            )}
+
+            {/* Previews */}
+            {fotos.length > 0 && (
+              <div className="mt-4 grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))' }}>
+                {fotos.map((foto, i) => (
+                  <div key={i} className="relative rounded-lg overflow-hidden" style={{ aspectRatio: '4/3', backgroundColor: '#E2E8F0' }}>
+                    <img
+                      src={foto.previewUrl}
+                      alt={`preview ${i + 1}`}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                    {/* Número */}
+                    <span style={{
+                      position: 'absolute', top: '6px', left: '6px',
+                      backgroundColor: 'rgba(0,0,0,0.55)', color: 'white',
+                      borderRadius: '999px', padding: '2px 7px', fontSize: '11px', fontWeight: 'bold',
+                    }}>
+                      {i + 1}
+                    </span>
+                    {/* Quitar */}
                     <button
                       type="button"
                       onClick={() => quitarFoto(i)}
-                      className="text-xs px-2 py-1 rounded"
-                      style={{ color: '#e53e3e', backgroundColor: '#FFF5F5' }}
+                      style={{
+                        position: 'absolute', top: '6px', right: '6px',
+                        backgroundColor: 'rgba(229,62,62,0.85)', color: 'white',
+                        border: 'none', borderRadius: '50%', width: '22px', height: '22px',
+                        fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}
                     >
-                      Quitar
+                      ✕
                     </button>
-                  )}
-                </div>
-              ))}
+                    {/* Nombre del archivo */}
+                    <div style={{
+                      position: 'absolute', bottom: 0, left: 0, right: 0,
+                      backgroundColor: 'rgba(0,0,0,0.5)', color: 'white',
+                      fontSize: '10px', padding: '3px 6px',
+                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                    }}>
+                      {foto.file.name}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Contador y validación */}
+            <div className="mt-3 flex items-center justify-between">
+              <span className="text-xs" style={{ color: fotos.length < MIN_FOTOS ? '#e53e3e' : '#2D6A4F', fontWeight: '500' }}>
+                {fotos.length < MIN_FOTOS
+                  ? `Faltan ${MIN_FOTOS - fotos.length} foto${MIN_FOTOS - fotos.length !== 1 ? 's' : ''} más`
+                  : `✓ ${fotos.length} foto${fotos.length !== 1 ? 's' : ''} lista${fotos.length !== 1 ? 's' : ''}`
+                }
+              </span>
+              {fotos.length >= MAX_FOTOS && (
+                <span className="text-xs" style={{ color: '#999' }}>Límite máximo alcanzado</span>
+              )}
             </div>
-            {form.fotos.length < 10 && (
-              <button
-                type="button"
-                onClick={agregarFoto}
-                className="mt-3 text-sm font-medium"
-                style={{ color: '#2D6A4F' }}
-              >
-                + Agregar otra foto
-              </button>
+
+            {/* Barra de progreso de subida */}
+            {progreso && (
+              <div className="mt-4">
+                <div className="flex justify-between text-xs mb-1" style={{ color: '#555' }}>
+                  <span>Subiendo foto {progreso.actual} de {progreso.total}...</span>
+                  <span>{porcentaje}%</span>
+                </div>
+                <div className="w-full rounded-full overflow-hidden" style={{ height: '8px', backgroundColor: '#E2E8F0' }}>
+                  <div
+                    style={{
+                      height: '100%', backgroundColor: '#52B788',
+                      width: `${porcentaje}%`, transition: 'width 0.3s ease',
+                      borderRadius: '999px',
+                    }}
+                  />
+                </div>
+              </div>
             )}
           </section>
 
@@ -499,11 +616,14 @@ export default function NuevaPropiedad() {
             </Link>
             <button
               type="submit"
-              disabled={enviando}
+              disabled={enviando || fotos.length < MIN_FOTOS}
               className="px-8 py-3 rounded-lg text-sm font-bold text-white"
-              style={{ backgroundColor: enviando ? '#A0AEC0' : '#52B788', cursor: enviando ? 'not-allowed' : 'pointer' }}
+              style={{
+                backgroundColor: (enviando || fotos.length < MIN_FOTOS) ? '#A0AEC0' : '#52B788',
+                cursor: (enviando || fotos.length < MIN_FOTOS) ? 'not-allowed' : 'pointer',
+              }}
             >
-              {enviando ? 'Publicando...' : 'Publicar propiedad'}
+              {enviando ? `Subiendo fotos (${progreso?.actual ?? 0}/${progreso?.total ?? fotos.length})...` : 'Publicar propiedad'}
             </button>
           </div>
 
