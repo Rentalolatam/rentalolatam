@@ -39,6 +39,12 @@ export default function Navbar({ extraLinks }: NavbarProps) {
           Propiedades
         </Link>
 
+        {usuario?.tipo === 'Propietario' && (
+          <Link to="/inquilinos" style={{ color: 'white', textDecoration: 'none', fontSize: '14px' }}>
+            Inquilinos
+          </Link>
+        )}
+
         {extraLinks?.map((link) => (
           <a
             key={link.label}
