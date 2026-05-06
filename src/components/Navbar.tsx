@@ -18,6 +18,7 @@ export default function Navbar({ extraLinks }: NavbarProps) {
 
   const [tienePropiedades, setTienePropiedades] = useState(false)
   const [tieneArriendo, setTieneArriendo]       = useState(false)
+  const [tieneContratos, setTieneContratos]     = useState(false)
 
   useEffect(() => {
     if (!usuario) {
@@ -27,7 +28,7 @@ export default function Navbar({ extraLinks }: NavbarProps) {
     }
 
     const verificar = async () => {
-      const [{ count: propCount }, { count: solCount }] = await Promise.all([
+      const [{ count: propCount }, { count: solCount }, { count: contCount }] = await Promise.all([
         supabase
           .from('propiedades')
           .select('id', { count: 'exact', head: true })
@@ -37,9 +38,14 @@ export default function Navbar({ extraLinks }: NavbarProps) {
           .select('id', { count: 'exact', head: true })
           .eq('inquilino_id', usuario.id)
           .in('estado', ['aprobada', 'documentos_pendientes', 'documentos_enviados', 'activa']),
+        supabase
+          .from('contratos')
+          .select('id', { count: 'exact', head: true })
+          .eq('propietario_id', usuario.id),
       ])
       setTienePropiedades((propCount ?? 0) > 0)
       setTieneArriendo((solCount ?? 0) > 0)
+      setTieneContratos((contCount ?? 0) > 0)
     }
 
     verificar()
@@ -78,6 +84,12 @@ export default function Navbar({ extraLinks }: NavbarProps) {
         {tieneArriendo && (
           <Link to="/mi-arriendo" style={{ color: 'white', textDecoration: 'none', fontSize: '14px' }}>
             Mi arriendo
+          </Link>
+        )}
+
+        {tieneContratos && (
+          <Link to="/contratos" style={{ color: 'white', textDecoration: 'none', fontSize: '14px' }}>
+            Contratos
           </Link>
         )}
 
