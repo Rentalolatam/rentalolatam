@@ -124,7 +124,6 @@ export default function DetallePropiedad() {
 
   const p = propiedad
   const esPropietario = usuario?.id === p.publicado_por
-  const puedeArrendar = usuario && !esPropietario && p.estado === 'disponible'
 
   const SOLICITUD_ESTADO_LABEL: Record<SolicitudArriendo['estado'], string> = {
     pendiente: 'Solicitud pendiente de revisión',
@@ -326,9 +325,20 @@ export default function DetallePropiedad() {
 
               <div style={{ borderTop: '1px solid #F0F0F0', paddingTop: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
 
-                {/* Botón solicitar (solo si puede arrendar) */}
-                {puedeArrendar && (
-                  solicitudExistente ? (
+                {/* Botón solicitar — visible para no-propietarios (logueados o no) */}
+                {!esPropietario && (
+                  !usuario ? (
+                    <button
+                      onClick={() => navigate('/login')}
+                      style={{
+                        width: '100%', backgroundColor: '#52B788', color: 'white', border: 'none',
+                        borderRadius: '10px', padding: '14px', fontSize: '15px', fontWeight: 'bold',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Solicitar arrendar esta propiedad
+                    </button>
+                  ) : solicitudExistente ? (
                     <div style={{ backgroundColor: '#F0FFF4', border: '1px solid #9AE6B4', borderRadius: '10px', padding: '16px', textAlign: 'center' }}>
                       <div style={{ fontSize: '22px', marginBottom: '6px' }}>✅</div>
                       <p style={{ color: '#2D6A4F', fontSize: '13px', fontWeight: 'bold', margin: '0 0 4px' }}>
@@ -350,20 +360,6 @@ export default function DetallePropiedad() {
                       Solicitar arrendar esta propiedad
                     </button>
                   )
-                )}
-
-                {/* No logueado */}
-                {!usuario && (
-                  <button
-                    onClick={() => navigate('/login')}
-                    style={{
-                      width: '100%', backgroundColor: '#52B788', color: 'white', border: 'none',
-                      borderRadius: '10px', padding: '14px', fontSize: '15px', fontWeight: 'bold',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Iniciar sesión para arrendar
-                  </button>
                 )}
 
                 {/* Propietario viendo su propia propiedad */}
