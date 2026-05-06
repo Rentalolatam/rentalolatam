@@ -62,6 +62,20 @@ export type DocumentoInquilino = {
   created_at: string
 }
 
+export type Contrato = {
+  id: string
+  solicitud_id: string
+  propietario_id: string
+  inquilino_id: string
+  propiedad_id: string
+  envelope_id: string | null
+  estado: 'enviado' | 'firmado_inquilino' | 'firmado_propietario' | 'completado' | 'cancelado'
+  url_contrato: string | null
+  fecha_inicio: string | null
+  fecha_fin: string | null
+  created_at: string
+}
+
 export type SolicitudArriendo = {
   id: string
   propiedad_id: string

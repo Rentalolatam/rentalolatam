@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { supabase, type SolicitudArriendo, type DocumentoInquilino, type TipoDocumento } from '../lib/supabase'
+import { supabase, type SolicitudArriendo, type DocumentoInquilino, type TipoDocumento, type Contrato } from '../lib/supabase'
 import Navbar from '../components/Navbar'
+import { useAuth } from '../context/AuthContext'
 
 const BUCKET = 'documentos-inquilinos'
 
@@ -37,9 +38,20 @@ const ESTADO_CFG: Record<SolicitudArriendo['estado'], { label: string; bg: strin
 
 const MOSTRAR_DOCS = ['aprobada', 'documentos_pendientes', 'documentos_enviados', 'activa']
 
+const PUEDE_CONTRATAR = ['documentos_enviados', 'activa']
+
+const CONTRATO_CFG: Record<Contrato['estado'], { label: string; bg: string; color: string }> = {
+  enviado:             { label: 'Enviado a firmar',          bg: '#EBF8FF', color: '#2B6CB0' },
+  firmado_inquilino:   { label: 'Firmado por inquilino',     bg: '#FFFBEB', color: '#92400E' },
+  firmado_propietario: { label: 'Firmado por propietario',   bg: '#FFFBEB', color: '#92400E' },
+  completado:          { label: 'Contrato completado ✓',     bg: '#F0FFF4', color: '#276749' },
+  cancelado:           { label: 'Cancelado',                 bg: '#FFF5F5', color: '#c53030' },
+}
+
 export default function DetalleInquilino() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { usuario } = useAuth()
 
   const [solicitud, setSolicitud]    = useState<SolicitudConPropiedad | null>(null)
   const [documentos, setDocumentos]  = useState<DocumentoInquilino[]>([])
@@ -50,6 +62,15 @@ export default function DetalleInquilino() {
   const [errorDoc, setErrorDoc]      = useState<string | null>(null)
   const [aprobando, setAprobando]    = useState(false)
   const inputsRef                    = useRef<Record<string, HTMLInputElement | null>>({})
+
+  // Contrato
+  const [contrato, setContrato]              = useState<Contrato | null>(null)
+  const [docusignConectado, setDocusignConectado] = useState(true)
+  const [modalContrato, setModalContrato]    = useState(false)
+  const [fechaInicio, setFechaInicio]        = useState('')
+  const [fechaFin, setFechaFin]              = useState('')
+  const [enviandoContrato, setEnviandoContrato] = useState(false)
+  const [errorContrato, setErrorContrato]    = useState<string | null>(null)
 
   useEffect(() => {
     if (!id) return
@@ -75,6 +96,42 @@ export default function DetalleInquilino() {
     }
     cargar()
   }, [id])
+
+  // Cargar contrato existente + estado DocuSign
+  useEffect(() => {
+    if (!id || !usuario) return
+    const cargarExtras = async () => {
+      const [{ data: cData }, { data: dsData }] = await Promise.all([
+        supabase.from('contratos').select('*').eq('solicitud_id', id).maybeSingle(),
+        supabase.from('docusign_tokens').select('expires_at').eq('user_id', usuario.id).maybeSingle(),
+      ])
+      if (cData) setContrato(cData as Contrato)
+      setDocusignConectado(!!dsData)
+    }
+    cargarExtras()
+  }, [id, usuario])
+
+  const handleCrearContrato = async () => {
+    if (!solicitud || !fechaInicio || !fechaFin) return
+    setEnviandoContrato(true)
+    setErrorContrato(null)
+    const { data: { session } } = await supabase.auth.getSession()
+    const token = session?.access_token ?? ''
+    const res = await fetch('/api/docusign/crear-contrato', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ solicitud_id: solicitud.id, fecha_inicio: fechaInicio, fecha_fin: fechaFin }),
+    })
+    const data = await res.json() as { contrato?: Contrato; error?: string; envelope_id?: string }
+    if (!res.ok) {
+      if (data.error === 'docusign_no_conectado') setDocusignConectado(false)
+      else setErrorContrato(data.error ?? 'Error creando contrato')
+    } else {
+      if (data.contrato) setContrato(data.contrato)
+      setModalContrato(false)
+    }
+    setEnviandoContrato(false)
+  }
 
   const docPorTipo = (tipo: TipoDocumento) => documentos.find((d) => d.tipo === tipo) ?? null
 
@@ -169,6 +226,7 @@ export default function DetalleInquilino() {
   const mostrarAprobar = ['aprobada', 'documentos_pendientes', 'documentos_enviados'].includes(sol.estado)
 
   return (
+    <>
     <div style={{ minHeight: '100vh', backgroundColor: '#F8F9FA', fontFamily: 'Arial, sans-serif' }}>
       <Navbar />
 
@@ -368,6 +426,73 @@ export default function DetalleInquilino() {
           </div>
         )}
 
+        {/* ── SECCIÓN CONTRATO ── */}
+        {PUEDE_CONTRATAR.includes(sol.estado) && (
+          <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '24px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)' }}>
+            <h2 style={{ color: '#1B3A5C', fontSize: '15px', fontWeight: 'bold', margin: '0 0 16px' }}>📃 Contrato digital</h2>
+
+            {/* Contrato ya existente */}
+            {contrato ? (
+              <div>
+                {(() => {
+                  const cfg = CONTRATO_CFG[contrato.estado]
+                  return (
+                    <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <div style={{ flex: 1 }}>
+                        <span style={{ fontSize: '12px', fontWeight: 'bold', padding: '3px 10px', borderRadius: '999px', backgroundColor: cfg.bg, color: cfg.color }}>
+                          {cfg.label}
+                        </span>
+                        <p style={{ color: '#666', fontSize: '13px', margin: '8px 0 0' }}>
+                          Período: {contrato.fecha_inicio ? new Date(contrato.fecha_inicio + 'T00:00:00').toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                          {' al '}
+                          {contrato.fecha_fin ? new Date(contrato.fecha_fin + 'T00:00:00').toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                        </p>
+                        <p style={{ color: '#999', fontSize: '12px', margin: '4px 0 0' }}>
+                          Envelope ID: {contrato.envelope_id}
+                        </p>
+                      </div>
+                    </div>
+                  )
+                })()}
+              </div>
+            ) : (
+              /* Sin contrato — botón o conexión DocuSign */
+              <div>
+                {!docusignConectado ? (
+                  <div style={{ backgroundColor: '#FFFBEB', border: '1px solid #FED7AA', borderRadius: '10px', padding: '16px' }}>
+                    <p style={{ color: '#92400E', fontSize: '14px', margin: '0 0 12px', fontWeight: '500' }}>
+                      Conectá tu cuenta de DocuSign para enviar contratos para firma digital.
+                    </p>
+                    <a
+                      href={`/api/docusign/auth?user_id=${usuario?.id ?? ''}`}
+                      style={{ display: 'inline-block', backgroundColor: '#1B3A5C', color: 'white', padding: '8px 20px', borderRadius: '8px', fontSize: '13px', fontWeight: 'bold', textDecoration: 'none' }}
+                    >
+                      Conectar DocuSign
+                    </a>
+                  </div>
+                ) : (
+                  <div>
+                    <p style={{ color: '#666', fontSize: '13px', margin: '0 0 14px' }}>
+                      Generá el contrato de arrendamiento y envialo a ambas partes para firma digital vía DocuSign.
+                    </p>
+                    {errorContrato && (
+                      <div style={{ backgroundColor: '#FFF5F5', border: '1px solid #FEB2B2', color: '#c53030', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', marginBottom: '12px' }}>
+                        {errorContrato}
+                      </div>
+                    )}
+                    <button
+                      onClick={() => setModalContrato(true)}
+                      style={{ backgroundColor: '#1B3A5C', color: 'white', border: 'none', borderRadius: '8px', padding: '10px 24px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}
+                    >
+                      Generar y enviar contrato
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Volver */}
         <div>
           <button onClick={() => navigate('/inquilinos')} style={{ background: 'none', border: 'none', color: '#2D6A4F', fontSize: '14px', cursor: 'pointer', padding: 0 }}>
@@ -376,5 +501,51 @@ export default function DetalleInquilino() {
         </div>
       </div>
     </div>
+
+    {/* MODAL contrato */}
+    {modalContrato && (
+      <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+        <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '32px', maxWidth: '460px', width: '100%', boxShadow: '0 8px 32px rgba(0,0,0,0.2)' }}>
+          <h2 style={{ color: '#1B3A5C', fontSize: '19px', fontWeight: 'bold', margin: '0 0 6px' }}>Generar contrato</h2>
+          <p style={{ color: '#666', fontSize: '13px', margin: '0 0 20px' }}>
+            Se enviará un email a ambas partes con el contrato para firma digital vía DocuSign.
+          </p>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '20px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#555', marginBottom: '5px' }}>Fecha de inicio *</label>
+              <input type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} required style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1.5px solid #CBD5E0', fontSize: '14px', boxSizing: 'border-box' }} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#555', marginBottom: '5px' }}>Fecha de fin *</label>
+              <input type="date" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} required style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1.5px solid #CBD5E0', fontSize: '14px', boxSizing: 'border-box' }} />
+            </div>
+          </div>
+
+          {errorContrato && (
+            <div style={{ backgroundColor: '#FFF5F5', border: '1px solid #FEB2B2', color: '#c53030', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', marginBottom: '16px' }}>
+              {errorContrato}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+            <button
+              onClick={() => { setModalContrato(false); setErrorContrato(null) }}
+              style={{ padding: '10px 20px', borderRadius: '8px', border: '1.5px solid #CBD5E0', color: '#666', fontSize: '14px', backgroundColor: 'white', cursor: 'pointer' }}
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleCrearContrato}
+              disabled={enviandoContrato || !fechaInicio || !fechaFin}
+              style={{ padding: '10px 24px', borderRadius: '8px', border: 'none', backgroundColor: (enviandoContrato || !fechaInicio || !fechaFin) ? '#A0AEC0' : '#52B788', color: 'white', fontSize: '14px', fontWeight: 'bold', cursor: (enviandoContrato || !fechaInicio || !fechaFin) ? 'not-allowed' : 'pointer' }}
+            >
+              {enviandoContrato ? 'Enviando...' : 'Enviar a firmar'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   )
 }
