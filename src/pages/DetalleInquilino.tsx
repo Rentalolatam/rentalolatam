@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useParams, useNavigate } from 'react-router-dom'
-import { supabase, type Inquilino, type DocumentoInquilino, type TipoDocumento } from '../lib/supabase'
+import { useParams, useNavigate } from 'react-router-dom'
+import { supabase, type SolicitudArriendo, type DocumentoInquilino, type TipoDocumento } from '../lib/supabase'
 import Navbar from '../components/Navbar'
 
 const BUCKET = 'documentos-inquilinos'
@@ -22,38 +22,53 @@ const DOCS_CONFIG: DocConfig[] = [
   { tipo: 'prueba_ingresos',         label: 'Prueba de ingresos',       descripcion: 'Carta laboral, estado de cuenta, etc.', requerido: false, icon: '💼' },
 ]
 
-const ESTADO_CFG = {
-  basico:                { label: 'Básico',             bg: '#F7FAFC', color: '#4A5568' },
-  documentos_pendientes: { label: 'Docs. pendientes',   bg: '#FFFBEB', color: '#92400E' },
-  listo:                 { label: 'Listo',              bg: '#F0FFF4', color: '#2D6A4F' },
+type SolicitudConPropiedad = SolicitudArriendo & {
+  propiedades: { titulo: string; zona: string; tipo: string; precio_quetzales: number } | null
 }
+
+const ESTADO_CFG: Record<SolicitudArriendo['estado'], { label: string; bg: string; color: string }> = {
+  pendiente:             { label: 'Pendiente',           bg: '#FFFBEB', color: '#92400E' },
+  aprobada:              { label: 'Aprobada',            bg: '#EBF8FF', color: '#2B6CB0' },
+  rechazada:             { label: 'Rechazada',           bg: '#FFF5F5', color: '#c53030' },
+  documentos_pendientes: { label: 'Docs. en revisión',  bg: '#FFFBEB', color: '#92400E' },
+  documentos_enviados:   { label: 'Docs. enviados',     bg: '#F0FFF4', color: '#2D6A4F' },
+  activa:                { label: 'Activo',              bg: '#F0FFF4', color: '#276749' },
+}
+
+const MOSTRAR_DOCS = ['aprobada', 'documentos_pendientes', 'documentos_enviados', 'activa']
 
 export default function DetalleInquilino() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
 
-  const [inquilino, setInquilino]   = useState<Inquilino | null>(null)
-  const [documentos, setDocumentos] = useState<DocumentoInquilino[]>([])
-  const [cargando, setCargando]     = useState(true)
-  const [error, setError]           = useState<string | null>(null)
+  const [solicitud, setSolicitud]    = useState<SolicitudConPropiedad | null>(null)
+  const [documentos, setDocumentos]  = useState<DocumentoInquilino[]>([])
+  const [cargando, setCargando]      = useState(true)
+  const [error, setError]            = useState<string | null>(null)
 
-  // subiendo: tipo doc que se está subiendo actualmente
-  const [subiendo, setSubiendo] = useState<TipoDocumento | null>(null)
-  const [errorDoc, setErrorDoc] = useState<string | null>(null)
-  const inputsRef = useRef<Record<string, HTMLInputElement | null>>({})
+  const [subiendo, setSubiendo]      = useState<TipoDocumento | null>(null)
+  const [errorDoc, setErrorDoc]      = useState<string | null>(null)
+  const [aprobando, setAprobando]    = useState(false)
+  const inputsRef                    = useRef<Record<string, HTMLInputElement | null>>({})
 
   useEffect(() => {
     if (!id) return
     const cargar = async () => {
       setCargando(true)
-      const [{ data: inqData, error: inqErr }, { data: docData }] = await Promise.all([
-        supabase.from('inquilinos').select('*').eq('id', id).single(),
-        supabase.from('documentos_inquilino').select('*').eq('inquilino_id', id),
+      const [{ data: solData, error: solErr }, { data: docData }] = await Promise.all([
+        supabase
+          .from('solicitudes_arriendo')
+          .select('*, propiedades(titulo, zona, tipo, precio_quetzales)')
+          .eq('id', id)
+          .single(),
+        supabase
+          .from('documentos_inquilino')
+          .select('*')
+          .eq('inquilino_id', id),
       ])
-      if (inqErr) setError(inqErr.message)
-      else if (!docData) setError('Error cargando documentos')
+      if (solErr) setError(solErr.message)
       else {
-        setInquilino(inqData as Inquilino)
+        setSolicitud(solData as SolicitudConPropiedad)
         setDocumentos((docData as DocumentoInquilino[]) ?? [])
       }
       setCargando(false)
@@ -64,13 +79,13 @@ export default function DetalleInquilino() {
   const docPorTipo = (tipo: TipoDocumento) => documentos.find((d) => d.tipo === tipo) ?? null
 
   const handleSubir = async (tipo: TipoDocumento, file: File) => {
+    if (!id) return
     setErrorDoc(null)
     setSubiendo(tipo)
 
     const ext  = file.name.split('.').pop() ?? 'pdf'
-    const path = `${id}/${tipo}.${ext}`
+    const path = `solicitud_${id}/${tipo}.${ext}`
 
-    // Eliminar archivo previo si existe
     await supabase.storage.from(BUCKET).remove([path])
 
     const { data: uploadData, error: uploadErr } = await supabase.storage
@@ -85,7 +100,6 @@ export default function DetalleInquilino() {
 
     const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(uploadData.path)
 
-    // Upsert en tabla documentos_inquilino
     const existente = docPorTipo(tipo)
     if (existente) {
       await supabase.from('documentos_inquilino').update({ url: publicUrl, nombre_archivo: file.name }).eq('id', existente.id)
@@ -93,7 +107,6 @@ export default function DetalleInquilino() {
       await supabase.from('documentos_inquilino').insert({ inquilino_id: id, tipo, url: publicUrl, nombre_archivo: file.name })
     }
 
-    // Refrescar documentos y actualizar estado del inquilino
     const { data: docData } = await supabase.from('documentos_inquilino').select('*').eq('inquilino_id', id)
     const docs = (docData as DocumentoInquilino[]) ?? []
     setDocumentos(docs)
@@ -101,12 +114,20 @@ export default function DetalleInquilino() {
     const tiposSubidos = new Set(docs.map((d) => d.tipo))
     const requeridos   = DOCS_CONFIG.filter((c) => c.requerido).map((c) => c.tipo)
     const todoListo    = requeridos.every((t) => tiposSubidos.has(t))
-    const nuevoEstado  = todoListo ? 'listo' : tiposSubidos.size > 0 ? 'documentos_pendientes' : 'basico'
+    const nuevoEstado: SolicitudArriendo['estado'] = todoListo ? 'documentos_enviados' : 'documentos_pendientes'
 
-    await supabase.from('inquilinos').update({ estado: nuevoEstado }).eq('id', id)
-    setInquilino((prev) => prev ? { ...prev, estado: nuevoEstado as Inquilino['estado'] } : prev)
+    await supabase.from('solicitudes_arriendo').update({ estado: nuevoEstado }).eq('id', id)
+    setSolicitud((prev) => prev ? { ...prev, estado: nuevoEstado } : prev)
 
     setSubiendo(null)
+  }
+
+  const handleAprobarInquilino = async () => {
+    if (!id) return
+    setAprobando(true)
+    await supabase.from('solicitudes_arriendo').update({ estado: 'activa' }).eq('id', id)
+    setSolicitud((prev) => prev ? { ...prev, estado: 'activa' } : prev)
+    setAprobando(false)
   }
 
   /* ── Render estados ── */
@@ -123,12 +144,12 @@ export default function DetalleInquilino() {
     </div>
   )
 
-  if (error || !inquilino) return (
+  if (error || !solicitud) return (
     <div style={{ minHeight: '100vh', backgroundColor: '#F8F9FA', fontFamily: 'Arial, sans-serif' }}>
       <Navbar />
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: '12px' }}>
         <div style={{ fontSize: '48px' }}>⚠️</div>
-        <p style={{ color: '#666' }}>{error ?? 'Inquilino no encontrado.'}</p>
+        <p style={{ color: '#666' }}>{error ?? 'Solicitud no encontrada.'}</p>
         <button onClick={() => navigate('/inquilinos')} style={{ backgroundColor: '#1B3A5C', color: 'white', border: 'none', borderRadius: '8px', padding: '10px 24px', fontSize: '14px', cursor: 'pointer' }}>
           Volver a inquilinos
         </button>
@@ -136,9 +157,16 @@ export default function DetalleInquilino() {
     </div>
   )
 
-  const inq   = inquilino
-  const esCfg = ESTADO_CFG[inq.estado]
-  const iniciales = inq.nombre_completo.split(' ').slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '').join('')
+  const sol    = solicitud
+  const esCfg  = ESTADO_CFG[sol.estado]
+  const iniciales = (sol.inquilino_nombre ?? 'IN')
+    .split(' ')
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? '')
+    .join('')
+
+  const mostrarDocs   = MOSTRAR_DOCS.includes(sol.estado)
+  const mostrarAprobar = ['aprobada', 'documentos_pendientes', 'documentos_enviados'].includes(sol.estado)
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#F8F9FA', fontFamily: 'Arial, sans-serif' }}>
@@ -147,41 +175,70 @@ export default function DetalleInquilino() {
       {/* Breadcrumb */}
       <div style={{ backgroundColor: '#1B3A5C', padding: '14px 40px' }}>
         <div style={{ maxWidth: '1000px', margin: '0 auto', display: 'flex', gap: '8px', alignItems: 'center', fontSize: '13px' }}>
-          <Link to="/inquilinos" style={{ color: '#CBD5E0', textDecoration: 'none' }}>Inquilinos</Link>
+          <button onClick={() => navigate('/inquilinos')} style={{ background: 'none', border: 'none', color: '#CBD5E0', cursor: 'pointer', padding: 0, fontSize: '13px' }}>
+            Inquilinos
+          </button>
           <span style={{ color: '#4A6FA5' }}>›</span>
-          <span style={{ color: '#52B788' }}>{inq.nombre_completo}</span>
+          <span style={{ color: '#52B788' }}>{sol.inquilino_nombre ?? 'Inquilino'}</span>
         </div>
       </div>
 
       <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '32px 24px 80px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
-        {/* Encabezado del perfil */}
+        {/* Encabezado */}
         <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '28px', boxShadow: '0 1px 6px rgba(0,0,0,0.08)', display: 'flex', gap: '20px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
           <div style={{ width: '64px', height: '64px', borderRadius: '50%', backgroundColor: '#1B3A5C', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', fontWeight: 'bold', flexShrink: 0 }}>
             {iniciales}
           </div>
           <div style={{ flex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '6px' }}>
-              <h1 style={{ color: '#1B3A5C', fontSize: '22px', fontWeight: 'bold', margin: 0 }}>{inq.nombre_completo}</h1>
+              <h1 style={{ color: '#1B3A5C', fontSize: '22px', fontWeight: 'bold', margin: 0 }}>
+                {sol.inquilino_nombre ?? 'Inquilino'}
+              </h1>
               <span style={{ fontSize: '12px', fontWeight: 'bold', padding: '3px 10px', borderRadius: '999px', backgroundColor: esCfg.bg, color: esCfg.color }}>
                 {esCfg.label}
               </span>
             </div>
-            <p style={{ color: '#666', fontSize: '14px', margin: 0 }}>{inq.email}</p>
+            {sol.propiedades && (
+              <p style={{ color: '#52B788', fontSize: '14px', margin: 0, fontWeight: '500' }}>
+                📍 {sol.propiedades.titulo} · {sol.propiedades.zona}
+              </p>
+            )}
           </div>
+
+          {/* Botón aprobar inquilino */}
+          {mostrarAprobar && (
+            <button
+              onClick={handleAprobarInquilino}
+              disabled={aprobando}
+              style={{
+                padding: '10px 24px', borderRadius: '8px', border: 'none',
+                backgroundColor: aprobando ? '#A0AEC0' : '#52B788',
+                color: 'white', fontSize: '14px', fontWeight: 'bold',
+                cursor: aprobando ? 'not-allowed' : 'pointer', flexShrink: 0,
+              }}
+            >
+              {aprobando ? 'Procesando...' : '✓ Aprobar inquilino'}
+            </button>
+          )}
+
+          {sol.estado === 'activa' && (
+            <div style={{ backgroundColor: '#F0FFF4', border: '1px solid #9AE6B4', borderRadius: '8px', padding: '8px 16px' }}>
+              <span style={{ color: '#276749', fontSize: '13px', fontWeight: 'bold' }}>🏡 Arriendo activo</span>
+            </div>
+          )}
         </div>
 
-        {/* Datos personales */}
+        {/* Info de la solicitud */}
         <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '24px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)' }}>
-          <h2 style={{ color: '#1B3A5C', fontSize: '15px', fontWeight: 'bold', margin: '0 0 18px' }}>Datos personales</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px' }}>
+          <h2 style={{ color: '#1B3A5C', fontSize: '15px', fontWeight: 'bold', margin: '0 0 16px' }}>Información de la solicitud</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px' }}>
             {[
-              { label: 'Teléfono',          val: inq.telefono ?? '—' },
-              { label: 'Fecha de nac.',     val: inq.fecha_nacimiento ? new Date(inq.fecha_nacimiento + 'T00:00:00').toLocaleDateString('es-GT', { day: '2-digit', month: 'long', year: 'numeric' }) : '—' },
-              { label: 'Nacionalidad',      val: inq.nacionalidad },
-              { label: 'Tipo documento',    val: inq.tipo_documento ?? '—' },
-              { label: 'No. documento',     val: inq.numero_documento ?? '—' },
-              { label: 'Registrado',        val: new Date(inq.created_at).toLocaleDateString('es-GT', { day: '2-digit', month: 'long', year: 'numeric' }) },
+              { label: 'Estado',     val: esCfg.label },
+              { label: 'Propiedad', val: sol.propiedades?.titulo ?? '—' },
+              { label: 'Zona',      val: sol.propiedades?.zona ?? '—' },
+              { label: 'Precio',    val: sol.propiedades ? `Q${sol.propiedades.precio_quetzales.toLocaleString('es-GT')}/mes` : '—' },
+              { label: 'Solicitud', val: new Date(sol.created_at).toLocaleDateString('es-GT', { day: '2-digit', month: 'long', year: 'numeric' }) },
             ].map(({ label, val }) => (
               <div key={label} style={{ padding: '12px', backgroundColor: '#F8F9FA', borderRadius: '8px' }}>
                 <div style={{ fontSize: '11px', color: '#999', marginBottom: '3px' }}>{label}</div>
@@ -189,119 +246,127 @@ export default function DetalleInquilino() {
               </div>
             ))}
           </div>
-        </div>
 
-        {/* Documentos para contrato */}
-        <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '24px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)' }}>
-          <div style={{ marginBottom: '20px' }}>
-            <h2 style={{ color: '#1B3A5C', fontSize: '15px', fontWeight: 'bold', margin: '0 0 4px' }}>Documentos para contrato</h2>
-            <p style={{ color: '#666', fontSize: '13px', margin: 0 }}>
-              Los marcados con <span style={{ color: '#e53e3e' }}>*</span> son requeridos para marcar al inquilino como Listo.
-            </p>
-          </div>
-
-          {errorDoc && (
-            <div style={{ backgroundColor: '#FFF5F5', border: '1px solid #FEB2B2', color: '#c53030', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', marginBottom: '16px' }}>
-              {errorDoc}
+          {sol.mensaje && (
+            <div style={{ marginTop: '16px', padding: '14px', backgroundColor: '#FFFBEB', borderRadius: '8px', border: '1px solid #FED7AA' }}>
+              <div style={{ fontSize: '11px', color: '#999', marginBottom: '4px' }}>Mensaje del inquilino</div>
+              <p style={{ color: '#555', fontSize: '14px', margin: 0, fontStyle: 'italic', lineHeight: '1.6' }}>
+                "{sol.mensaje}"
+              </p>
             </div>
           )}
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {DOCS_CONFIG.map((cfg) => {
-              const doc        = docPorTipo(cfg.tipo)
-              const estaSubiendo = subiendo === cfg.tipo
-
-              return (
-                <div
-                  key={cfg.tipo}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: '14px',
-                    padding: '14px 16px', borderRadius: '10px',
-                    backgroundColor: doc ? '#F0FFF4' : '#FAFAFA',
-                    border: `1.5px solid ${doc ? '#9AE6B4' : '#E2E8F0'}`,
-                  }}
-                >
-                  {/* Icono + estado */}
-                  <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: doc ? '#C6F6D5' : '#E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', flexShrink: 0 }}>
-                    {doc ? '✅' : cfg.icon}
-                  </div>
-
-                  {/* Info */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ fontSize: '14px', fontWeight: '600', color: '#1B3A5C' }}>{cfg.label}</span>
-                      {cfg.requerido && <span style={{ color: '#e53e3e', fontSize: '12px' }}>*</span>}
-                    </div>
-                    <div style={{ fontSize: '12px', color: '#888' }}>
-                      {doc
-                        ? <><span style={{ color: '#2D6A4F', fontWeight: '500' }}>✓ Subido</span>{doc.nombre_archivo ? ` — ${doc.nombre_archivo}` : ''}</>
-                        : cfg.descripcion
-                      }
-                    </div>
-                  </div>
-
-                  {/* Acciones */}
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
-                    {doc && (
-                      <a
-                        href={doc.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{ fontSize: '12px', color: '#2D6A4F', textDecoration: 'none', padding: '5px 12px', border: '1px solid #9AE6B4', borderRadius: '6px', backgroundColor: 'white' }}
-                      >
-                        Ver
-                      </a>
-                    )}
-                    {/* Input file oculto */}
-                    <input
-                      ref={(el) => { inputsRef.current[cfg.tipo] = el }}
-                      type="file"
-                      accept="image/*,.pdf"
-                      style={{ display: 'none' }}
-                      onChange={(e) => {
-                        const file = e.target.files?.[0]
-                        if (file) handleSubir(cfg.tipo, file)
-                        e.target.value = ''
-                      }}
-                    />
-                    <button
-                      onClick={() => inputsRef.current[cfg.tipo]?.click()}
-                      disabled={estaSubiendo}
-                      style={{
-                        fontSize: '12px', fontWeight: 'bold',
-                        padding: '5px 14px', borderRadius: '6px', border: 'none', cursor: estaSubiendo ? 'not-allowed' : 'pointer',
-                        backgroundColor: estaSubiendo ? '#A0AEC0' : doc ? '#1B3A5C' : '#52B788',
-                        color: 'white',
-                      }}
-                    >
-                      {estaSubiendo ? 'Subiendo...' : doc ? 'Reemplazar' : 'Subir'}
-                    </button>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-
-          {/* Progreso general */}
-          <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid #F0F0F0' }}>
-            {(() => {
-              const requeridos  = DOCS_CONFIG.filter((c) => c.requerido)
-              const completados = requeridos.filter((c) => docPorTipo(c.tipo)).length
-              const pct         = Math.round((completados / requeridos.length) * 100)
-              return (
-                <>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#666', marginBottom: '6px' }}>
-                    <span>Documentos requeridos: {completados}/{requeridos.length}</span>
-                    <span>{pct}%</span>
-                  </div>
-                  <div style={{ height: '8px', backgroundColor: '#E2E8F0', borderRadius: '999px', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${pct}%`, backgroundColor: pct === 100 ? '#52B788' : '#F6AD55', borderRadius: '999px', transition: 'width 0.4s ease' }} />
-                  </div>
-                </>
-              )
-            })()}
-          </div>
         </div>
+
+        {/* Documentos (solo si está aprobada o más) */}
+        {mostrarDocs && (
+          <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '24px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)' }}>
+            <div style={{ marginBottom: '20px' }}>
+              <h2 style={{ color: '#1B3A5C', fontSize: '15px', fontWeight: 'bold', margin: '0 0 4px' }}>Documentos para contrato</h2>
+              <p style={{ color: '#666', fontSize: '13px', margin: 0 }}>
+                Los marcados con <span style={{ color: '#e53e3e' }}>*</span> son requeridos para marcar al inquilino como Listo.
+              </p>
+            </div>
+
+            {errorDoc && (
+              <div style={{ backgroundColor: '#FFF5F5', border: '1px solid #FEB2B2', color: '#c53030', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', marginBottom: '16px' }}>
+                {errorDoc}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {DOCS_CONFIG.map((cfg) => {
+                const doc          = docPorTipo(cfg.tipo)
+                const estaSubiendo = subiendo === cfg.tipo
+
+                return (
+                  <div
+                    key={cfg.tipo}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '14px',
+                      padding: '14px 16px', borderRadius: '10px',
+                      backgroundColor: doc ? '#F0FFF4' : '#FAFAFA',
+                      border: `1.5px solid ${doc ? '#9AE6B4' : '#E2E8F0'}`,
+                    }}
+                  >
+                    <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: doc ? '#C6F6D5' : '#E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', flexShrink: 0 }}>
+                      {doc ? '✅' : cfg.icon}
+                    </div>
+
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '14px', fontWeight: '600', color: '#1B3A5C' }}>{cfg.label}</span>
+                        {cfg.requerido && <span style={{ color: '#e53e3e', fontSize: '12px' }}>*</span>}
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#888' }}>
+                        {doc
+                          ? <><span style={{ color: '#2D6A4F', fontWeight: '500' }}>✓ Subido</span>{doc.nombre_archivo ? ` — ${doc.nombre_archivo}` : ''}</>
+                          : cfg.descripcion
+                        }
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
+                      {doc && (
+                        <a
+                          href={doc.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{ fontSize: '12px', color: '#2D6A4F', textDecoration: 'none', padding: '5px 12px', border: '1px solid #9AE6B4', borderRadius: '6px', backgroundColor: 'white' }}
+                        >
+                          Ver
+                        </a>
+                      )}
+                      <input
+                        ref={(el) => { inputsRef.current[cfg.tipo] = el }}
+                        type="file"
+                        accept="image/*,.pdf"
+                        style={{ display: 'none' }}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0]
+                          if (file) handleSubir(cfg.tipo, file)
+                          e.target.value = ''
+                        }}
+                      />
+                      <button
+                        onClick={() => inputsRef.current[cfg.tipo]?.click()}
+                        disabled={estaSubiendo}
+                        style={{
+                          fontSize: '12px', fontWeight: 'bold',
+                          padding: '5px 14px', borderRadius: '6px', border: 'none',
+                          cursor: estaSubiendo ? 'not-allowed' : 'pointer',
+                          backgroundColor: estaSubiendo ? '#A0AEC0' : doc ? '#1B3A5C' : '#52B788',
+                          color: 'white',
+                        }}
+                      >
+                        {estaSubiendo ? 'Subiendo...' : doc ? 'Reemplazar' : 'Subir'}
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Progreso */}
+            <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid #F0F0F0' }}>
+              {(() => {
+                const requeridos  = DOCS_CONFIG.filter((c) => c.requerido)
+                const completados = requeridos.filter((c) => docPorTipo(c.tipo)).length
+                const pct         = Math.round((completados / requeridos.length) * 100)
+                return (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#666', marginBottom: '6px' }}>
+                      <span>Documentos requeridos: {completados}/{requeridos.length}</span>
+                      <span>{pct}%</span>
+                    </div>
+                    <div style={{ height: '8px', backgroundColor: '#E2E8F0', borderRadius: '999px', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${pct}%`, backgroundColor: pct === 100 ? '#52B788' : '#F6AD55', borderRadius: '999px', transition: 'width 0.4s ease' }} />
+                    </div>
+                  </>
+                )
+              })()}
+            </div>
+          </div>
+        )}
 
         {/* Volver */}
         <div>

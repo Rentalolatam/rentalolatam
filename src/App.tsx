@@ -8,6 +8,7 @@ import DetallePropiedad from './pages/DetallePropiedad'
 import Inquilinos from './pages/Inquilinos'
 import NuevoInquilino from './pages/NuevoInquilino'
 import DetalleInquilino from './pages/DetalleInquilino'
+import MiArriendo from './pages/MiArriendo'
 import Login from './pages/Login'
 import Registro from './pages/Registro'
 
@@ -184,6 +185,7 @@ function App() {
           <Route path="/inquilinos" element={<ProtectedRoute><Inquilinos /></ProtectedRoute>} />
           <Route path="/inquilinos/nuevo" element={<ProtectedRoute><NuevoInquilino /></ProtectedRoute>} />
           <Route path="/inquilinos/:id" element={<ProtectedRoute><DetalleInquilino /></ProtectedRoute>} />
+          <Route path="/mi-arriendo" element={<ProtectedRoute><MiArriendo /></ProtectedRoute>} />
           <Route
             path="/propiedades/nueva"
             element={

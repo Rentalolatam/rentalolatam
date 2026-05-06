@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { supabase, type Propiedad } from '../lib/supabase'
+import { supabase, type Propiedad, type SolicitudArriendo } from '../lib/supabase'
 import Navbar from '../components/Navbar'
+import { useAuth } from '../context/AuthContext'
 
 const ESTADO_BADGE: Record<string, { label: string; bg: string; color: string }> = {
   disponible: { label: 'Disponible', bg: '#F0FFF4', color: '#2D6A4F' },
@@ -12,11 +13,18 @@ const ESTADO_BADGE: Record<string, { label: string; bg: string; color: string }>
 export default function DetallePropiedad() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { usuario } = useAuth()
+
   const [propiedad, setPropiedad] = useState<Propiedad | null>(null)
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [fotoActiva, setFotoActiva] = useState(0)
-  const [contactoVisible, setContactoVisible] = useState(false)
+
+  const [solicitudExistente, setSolicitudExistente] = useState<SolicitudArriendo | null>(null)
+  const [modalAbierto, setModalAbierto] = useState(false)
+  const [mensajeSolicitud, setMensajeSolicitud] = useState('')
+  const [enviandoSolicitud, setEnviandoSolicitud] = useState(false)
+  const [errorSolicitud, setErrorSolicitud] = useState<string | null>(null)
 
   useEffect(() => {
     if (!id) return
@@ -27,15 +35,51 @@ export default function DetallePropiedad() {
         .select('*')
         .eq('id', id)
         .single()
-      if (sbError) {
-        setError(sbError.message)
-      } else {
-        setPropiedad(data as Propiedad)
-      }
+      if (sbError) setError(sbError.message)
+      else setPropiedad(data as Propiedad)
       setCargando(false)
     }
     cargar()
   }, [id])
+
+  useEffect(() => {
+    if (!id || !usuario) return
+    const cargarSolicitud = async () => {
+      const { data } = await supabase
+        .from('solicitudes_arriendo')
+        .select('*')
+        .eq('propiedad_id', id)
+        .eq('inquilino_id', usuario.id)
+        .maybeSingle()
+      if (data) setSolicitudExistente(data as SolicitudArriendo)
+    }
+    cargarSolicitud()
+  }, [id, usuario])
+
+  const handleSolicitar = async () => {
+    if (!usuario || !propiedad) return
+    setErrorSolicitud(null)
+    setEnviandoSolicitud(true)
+    const { data, error: sbError } = await supabase
+      .from('solicitudes_arriendo')
+      .insert({
+        propiedad_id: propiedad.id,
+        inquilino_id: usuario.id,
+        propietario_id: propiedad.publicado_por,
+        mensaje: mensajeSolicitud.trim() || null,
+        inquilino_nombre: usuario.nombre,
+      })
+      .select()
+      .single()
+    if (sbError) {
+      setErrorSolicitud(`No se pudo enviar la solicitud: ${sbError.message}`)
+    } else {
+      setSolicitudExistente(data as SolicitudArriendo)
+      setModalAbierto(false)
+      setMensajeSolicitud('')
+    }
+    setEnviandoSolicitud(false)
+  }
 
   const fotos = propiedad?.fotos?.filter(Boolean) ?? []
   const badge = propiedad ? (ESTADO_BADGE[propiedad.estado] ?? ESTADO_BADGE['disponible']) : null
@@ -79,6 +123,17 @@ export default function DetallePropiedad() {
   }
 
   const p = propiedad
+  const esPropietario = usuario?.id === p.publicado_por
+  const puedeArrendar = usuario && !esPropietario && p.estado === 'disponible'
+
+  const SOLICITUD_ESTADO_LABEL: Record<SolicitudArriendo['estado'], string> = {
+    pendiente: 'Solicitud pendiente de revisión',
+    aprobada: 'Solicitud aprobada',
+    rechazada: 'Solicitud rechazada',
+    documentos_pendientes: 'Documentos en revisión',
+    documentos_enviados: 'Documentos enviados',
+    activa: 'Arriendo activo',
+  }
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#F8F9FA', fontFamily: 'Arial, sans-serif' }}>
@@ -101,7 +156,6 @@ export default function DetallePropiedad() {
 
         {/* GALERÍA */}
         <div style={{ marginBottom: '32px' }}>
-          {/* Foto principal */}
           <div style={{
             width: '100%', height: '480px', borderRadius: '16px', overflow: 'hidden',
             backgroundColor: '#CBD5E0', marginBottom: '12px', position: 'relative',
@@ -119,7 +173,6 @@ export default function DetallePropiedad() {
               </div>
             )}
 
-            {/* Contador de fotos */}
             {fotos.length > 1 && (
               <div style={{
                 position: 'absolute', bottom: '16px', right: '16px',
@@ -130,7 +183,6 @@ export default function DetallePropiedad() {
               </div>
             )}
 
-            {/* Flechas de navegación */}
             {fotos.length > 1 && (
               <>
                 <button
@@ -159,7 +211,6 @@ export default function DetallePropiedad() {
             )}
           </div>
 
-          {/* Miniaturas */}
           {fotos.length > 1 && (
             <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
               {fotos.map((url, i) => (
@@ -231,7 +282,6 @@ export default function DetallePropiedad() {
               </div>
             )}
 
-            {/* Botón volver */}
             <div>
               <button
                 onClick={() => navigate('/propiedades')}
@@ -242,7 +292,7 @@ export default function DetallePropiedad() {
             </div>
           </div>
 
-          {/* COLUMNA DERECHA — Panel de precio y contacto */}
+          {/* COLUMNA DERECHA — Panel de precio y acción */}
           <div style={{ position: 'sticky', top: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
             <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '28px', boxShadow: '0 2px 12px rgba(0,0,0,0.1)' }}>
@@ -274,41 +324,70 @@ export default function DetallePropiedad() {
                 )}
               </div>
 
-              <div style={{ borderTop: '1px solid #F0F0F0', paddingTop: '20px' }}>
-                {/* Botón contactar */}
-                {!contactoVisible ? (
+              <div style={{ borderTop: '1px solid #F0F0F0', paddingTop: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+
+                {/* Botón solicitar (solo si puede arrendar) */}
+                {puedeArrendar && (
+                  solicitudExistente ? (
+                    <div style={{ backgroundColor: '#F0FFF4', border: '1px solid #9AE6B4', borderRadius: '10px', padding: '16px', textAlign: 'center' }}>
+                      <div style={{ fontSize: '22px', marginBottom: '6px' }}>✅</div>
+                      <p style={{ color: '#2D6A4F', fontSize: '13px', fontWeight: 'bold', margin: '0 0 4px' }}>
+                        {SOLICITUD_ESTADO_LABEL[solicitudExistente.estado]}
+                      </p>
+                      <p style={{ color: '#555', fontSize: '12px', margin: 0, lineHeight: '1.5' }}>
+                        El propietario revisará tu solicitud pronto.
+                      </p>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setModalAbierto(true)}
+                      style={{
+                        width: '100%', backgroundColor: '#52B788', color: 'white', border: 'none',
+                        borderRadius: '10px', padding: '14px', fontSize: '15px', fontWeight: 'bold',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Solicitar arrendar esta propiedad
+                    </button>
+                  )
+                )}
+
+                {/* No logueado */}
+                {!usuario && (
                   <button
-                    onClick={() => setContactoVisible(true)}
+                    onClick={() => navigate('/login')}
                     style={{
                       width: '100%', backgroundColor: '#52B788', color: 'white', border: 'none',
                       borderRadius: '10px', padding: '14px', fontSize: '15px', fontWeight: 'bold',
                       cursor: 'pointer',
                     }}
                   >
-                    Contactar propietario
+                    Iniciar sesión para arrendar
                   </button>
-                ) : (
-                  <div style={{ backgroundColor: '#F0FFF4', border: '1px solid #9AE6B4', borderRadius: '10px', padding: '16px', textAlign: 'center' }}>
-                    <div style={{ fontSize: '24px', marginBottom: '8px' }}>📬</div>
-                    <p style={{ color: '#2D6A4F', fontSize: '13px', fontWeight: 'bold', margin: '0 0 4px' }}>
-                      Mensaje enviado
-                    </p>
-                    <p style={{ color: '#555', fontSize: '12px', margin: 0, lineHeight: '1.5' }}>
-                      El propietario recibirá tu consulta y te contactará a la brevedad.
+                )}
+
+                {/* Propietario viendo su propia propiedad */}
+                {esPropietario && (
+                  <div style={{ backgroundColor: '#EBF8FF', border: '1px solid #BEE3F8', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
+                    <p style={{ color: '#2B6CB0', fontSize: '13px', margin: 0, fontWeight: '500' }}>
+                      Esta es tu propiedad publicada
                     </p>
                   </div>
                 )}
 
-                <button
-                  onClick={() => navigate('/propiedades/nueva')}
-                  style={{
-                    width: '100%', backgroundColor: 'transparent', color: '#1B3A5C',
-                    border: '1.5px solid #1B3A5C', borderRadius: '10px', padding: '12px',
-                    fontSize: '14px', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px',
-                  }}
-                >
-                  ¿Tenés una propiedad? Publicala
-                </button>
+                {/* Publicar tu propiedad (solo si no es propietario de esta prop) */}
+                {!esPropietario && (
+                  <button
+                    onClick={() => navigate('/propiedades/nueva')}
+                    style={{
+                      width: '100%', backgroundColor: 'transparent', color: '#1B3A5C',
+                      border: '1.5px solid #1B3A5C', borderRadius: '10px', padding: '12px',
+                      fontSize: '14px', fontWeight: 'bold', cursor: 'pointer',
+                    }}
+                  >
+                    ¿Tenés una propiedad? Publicala
+                  </button>
+                )}
               </div>
             </div>
 
@@ -332,6 +411,75 @@ export default function DetallePropiedad() {
           </div>
         </div>
       </div>
+
+      {/* MODAL de solicitud */}
+      {modalAbierto && (
+        <div style={{
+          position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)',
+          zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '24px',
+        }}>
+          <div style={{
+            backgroundColor: 'white', borderRadius: '16px', padding: '32px',
+            maxWidth: '480px', width: '100%', boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+          }}>
+            <h2 style={{ color: '#1B3A5C', fontSize: '20px', fontWeight: 'bold', margin: '0 0 6px' }}>
+              Solicitar arriendo
+            </h2>
+            <p style={{ color: '#666', fontSize: '13px', margin: '0 0 20px' }}>
+              {p.titulo} · {p.zona}
+            </p>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#555', marginBottom: '6px' }}>
+                Mensaje al propietario (opcional)
+              </label>
+              <textarea
+                value={mensajeSolicitud}
+                onChange={(e) => setMensajeSolicitud(e.target.value)}
+                placeholder="Presentate y contá un poco sobre vos, tu situación, cuándo querés mudarte, etc."
+                rows={4}
+                style={{
+                  width: '100%', padding: '10px 12px', borderRadius: '8px',
+                  border: '1.5px solid #CBD5E0', fontSize: '14px',
+                  outline: 'none', resize: 'vertical', boxSizing: 'border-box',
+                  fontFamily: 'Arial, sans-serif',
+                }}
+              />
+            </div>
+
+            {errorSolicitud && (
+              <div style={{ backgroundColor: '#FFF5F5', border: '1px solid #FEB2B2', color: '#c53030', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', marginBottom: '16px' }}>
+                {errorSolicitud}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => { setModalAbierto(false); setMensajeSolicitud(''); setErrorSolicitud(null) }}
+                style={{
+                  padding: '10px 20px', borderRadius: '8px', border: '1.5px solid #CBD5E0',
+                  color: '#666', fontSize: '14px', backgroundColor: 'white', cursor: 'pointer',
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSolicitar}
+                disabled={enviandoSolicitud}
+                style={{
+                  padding: '10px 24px', borderRadius: '8px', border: 'none',
+                  backgroundColor: enviandoSolicitud ? '#A0AEC0' : '#52B788',
+                  color: 'white', fontSize: '14px', fontWeight: 'bold',
+                  cursor: enviandoSolicitud ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {enviandoSolicitud ? 'Enviando...' : 'Enviar solicitud'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

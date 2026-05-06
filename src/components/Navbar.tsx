@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 
 const TIPO_BADGE: Record<string, { bg: string; color: string }> = {
@@ -7,13 +9,41 @@ const TIPO_BADGE: Record<string, { bg: string; color: string }> = {
 }
 
 type NavbarProps = {
-  /** Links adicionales que aparecen entre "Propiedades" y los botones de auth */
   extraLinks?: { label: string; href: string }[]
 }
 
 export default function Navbar({ extraLinks }: NavbarProps) {
   const { usuario, logout } = useAuth()
   const navigate = useNavigate()
+
+  const [tienePropiedades, setTienePropiedades] = useState(false)
+  const [tieneArriendo, setTieneArriendo]       = useState(false)
+
+  useEffect(() => {
+    if (!usuario) {
+      setTienePropiedades(false)
+      setTieneArriendo(false)
+      return
+    }
+
+    const verificar = async () => {
+      const [{ count: propCount }, { count: solCount }] = await Promise.all([
+        supabase
+          .from('propiedades')
+          .select('id', { count: 'exact', head: true })
+          .eq('publicado_por', usuario.id),
+        supabase
+          .from('solicitudes_arriendo')
+          .select('id', { count: 'exact', head: true })
+          .eq('inquilino_id', usuario.id)
+          .in('estado', ['aprobada', 'documentos_pendientes', 'documentos_enviados', 'activa']),
+      ])
+      setTienePropiedades((propCount ?? 0) > 0)
+      setTieneArriendo((solCount ?? 0) > 0)
+    }
+
+    verificar()
+  }, [usuario])
 
   const handleLogout = async () => {
     await logout()
@@ -39,9 +69,15 @@ export default function Navbar({ extraLinks }: NavbarProps) {
           Propiedades
         </Link>
 
-        {usuario?.tipo === 'Propietario' && (
+        {tienePropiedades && (
           <Link to="/inquilinos" style={{ color: 'white', textDecoration: 'none', fontSize: '14px' }}>
             Inquilinos
+          </Link>
+        )}
+
+        {tieneArriendo && (
+          <Link to="/mi-arriendo" style={{ color: 'white', textDecoration: 'none', fontSize: '14px' }}>
+            Mi arriendo
           </Link>
         )}
 

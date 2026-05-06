@@ -61,3 +61,15 @@ export type DocumentoInquilino = {
   nombre_archivo: string | null
   created_at: string
 }
+
+export type SolicitudArriendo = {
+  id: string
+  propiedad_id: string
+  inquilino_id: string
+  propietario_id: string
+  estado: 'pendiente' | 'aprobada' | 'rechazada' | 'documentos_pendientes' | 'documentos_enviados' | 'activa'
+  mensaje: string | null
+  inquilino_nombre: string | null
+  created_at: string
+  updated_at: string
+}
