@@ -28,3 +28,36 @@ export type Propiedad = {
   publicado_por: string | null
   created_at: string
 }
+
+export type Inquilino = {
+  id: string
+  user_id: string | null
+  propietario_id: string | null
+  nombre_completo: string
+  email: string
+  telefono: string | null
+  fecha_nacimiento: string | null
+  tipo_documento: 'DPI' | 'Pasaporte' | null
+  numero_documento: string | null
+  nacionalidad: string
+  estado: 'basico' | 'documentos_pendientes' | 'listo'
+  invitado_por_propietario: boolean
+  created_at: string
+}
+
+export type TipoDocumento =
+  | 'dpi_frente'
+  | 'dpi_reverso'
+  | 'recibo_servicio'
+  | 'antecedentes_policiales'
+  | 'antecedentes_penales'
+  | 'prueba_ingresos'
+
+export type DocumentoInquilino = {
+  id: string
+  inquilino_id: string
+  tipo: TipoDocumento
+  url: string
+  nombre_archivo: string | null
+  created_at: string
+}
