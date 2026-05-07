@@ -281,6 +281,53 @@ export default function DetallePropiedad() {
               </div>
             )}
 
+            {/* Sobre el edificio / condominio */}
+            {p.tiene_info_edificio && ((p.amenidades_edificio?.length ?? 0) > 0 || (p.fotos_edificio?.length ?? 0) > 0) && (() => {
+              const labelEdificio = p.tipo === 'Apartamento' ? 'Sobre el edificio' : 'Sobre el condominio/residencial'
+              const amenidades = p.amenidades_edificio ?? []
+              const fotosEdif = p.fotos_edificio ?? []
+              return (
+                <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '24px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>
+                  <h2 style={{ color: '#1B3A5C', fontSize: '16px', fontWeight: 'bold', marginBottom: '16px' }}>
+                    🏢 {labelEdificio}
+                  </h2>
+
+                  {amenidades.length > 0 && (
+                    <div style={{ marginBottom: fotosEdif.length > 0 ? '20px' : 0 }}>
+                      <p style={{ fontSize: '13px', fontWeight: '600', color: '#555', marginBottom: '10px' }}>Amenidades</p>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                        {amenidades.map(a => (
+                          <div key={a} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', borderRadius: '8px', backgroundColor: '#F0FFF4', border: '1px solid #C6F6D5' }}>
+                            <span style={{ color: '#2D6A4F', fontWeight: 'bold', fontSize: '14px' }}>✓</span>
+                            <span style={{ color: '#2D6A4F', fontSize: '13px' }}>{a}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {fotosEdif.length > 0 && (
+                    <div>
+                      <p style={{ fontSize: '13px', fontWeight: '600', color: '#555', marginBottom: '10px' }}>
+                        📷 Fotos del {p.tipo === 'Apartamento' ? 'edificio' : 'condominio/residencial'}
+                      </p>
+                      <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
+                        {fotosEdif.map((url, i) => (
+                          <div key={i} style={{ flexShrink: 0, width: '160px', height: '110px', borderRadius: '10px', overflow: 'hidden', backgroundColor: '#CBD5E0', border: '2px solid #E2E8F0' }}>
+                            <img
+                              src={url}
+                              alt={`${labelEdificio} ${i + 1}`}
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
+
             <div>
               <button
                 onClick={() => navigate('/propiedades')}

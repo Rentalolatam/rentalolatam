@@ -7,7 +7,18 @@ import { useAuth } from '../context/AuthContext'
 const TIPO_CAMBIO = 7.75
 const MIN_FOTOS = 3
 const MAX_FOTOS = 10
+const MAX_FOTOS_EDIFICIO = 10
 const BUCKET = 'propiedades-fotos'
+
+const AMENIDADES_LIST = [
+  'Parqueo de visitas',
+  'Gimnasio',
+  'Jardín',
+  'Área social',
+  'Pet garden',
+  'Piscina',
+  'Otro',
+]
 
 type FormData = {
   titulo: string
@@ -55,17 +66,25 @@ const initialForm: FormData = {
 export default function NuevaPropiedad() {
   const navigate = useNavigate()
   const { usuario } = useAuth()
-  const inputFileRef = useRef<HTMLInputElement>(null)
+  const inputFileRef    = useRef<HTMLInputElement>(null)
+  const inputEdificioRef = useRef<HTMLInputElement>(null)
 
-  const [form, setForm] = useState<FormData>(initialForm)
-  const [fotos, setFotos] = useState<FotoLocal[]>([])
-  const [enviando, setEnviando] = useState(false)
-  const [progreso, setProgreso] = useState<{ actual: number; total: number } | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [form, setForm]                     = useState<FormData>(initialForm)
+  const [fotos, setFotos]                   = useState<FotoLocal[]>([])
+  const [fotosEdificio, setFotosEdificio]   = useState<FotoLocal[]>([])
+  const [enCondominio, setEnCondominio]     = useState(false)
+  const [amenidades, setAmenidades]         = useState<string[]>([])
+  const [amenidadOtro, setAmenidadOtro]     = useState('')
+  const [enviando, setEnviando]             = useState(false)
+  const [progreso, setProgreso]             = useState<{ actual: number; total: number } | null>(null)
+  const [error, setError]                   = useState<string | null>(null)
 
   const precioDolares = form.precio_quetzales
     ? (parseFloat(form.precio_quetzales) / TIPO_CAMBIO).toFixed(2)
     : ''
+
+  const mostrarInfoEdificio = form.tipo === 'Apartamento' || (form.tipo === 'Casa' && enCondominio)
+  const seccionLabel = form.tipo === 'Apartamento' ? 'Información del edificio' : 'Información del condominio/residencial'
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -76,27 +95,37 @@ export default function NuevaPropiedad() {
     []
   )
 
+  const toggleAmenidad = (amenidad: string) => {
+    setAmenidades(prev =>
+      prev.includes(amenidad) ? prev.filter(a => a !== amenidad) : [...prev, amenidad]
+    )
+  }
+
   const handleSeleccionarArchivos = (e: React.ChangeEvent<HTMLInputElement>) => {
     const archivos = Array.from(e.target.files ?? [])
     if (!archivos.length) return
-
-    const nuevas: FotoLocal[] = archivos.map((file) => ({
-      file,
-      previewUrl: URL.createObjectURL(file),
-    }))
-
-    setFotos((prev) => {
-      // Liberar URLs anteriores que queden fuera del límite
-      const combinadas = [...prev, ...nuevas].slice(0, MAX_FOTOS)
-      return combinadas
-    })
-
-    // Limpiar el input para permitir re-selección del mismo archivo
+    const nuevas: FotoLocal[] = archivos.map(file => ({ file, previewUrl: URL.createObjectURL(file) }))
+    setFotos(prev => [...prev, ...nuevas].slice(0, MAX_FOTOS))
     e.target.value = ''
   }
 
   const quitarFoto = (index: number) => {
-    setFotos((prev) => {
+    setFotos(prev => {
+      URL.revokeObjectURL(prev[index].previewUrl)
+      return prev.filter((_, i) => i !== index)
+    })
+  }
+
+  const handleSeleccionarEdificio = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const archivos = Array.from(e.target.files ?? [])
+    if (!archivos.length) return
+    const nuevas: FotoLocal[] = archivos.map(file => ({ file, previewUrl: URL.createObjectURL(file) }))
+    setFotosEdificio(prev => [...prev, ...nuevas].slice(0, MAX_FOTOS_EDIFICIO))
+    e.target.value = ''
+  }
+
+  const quitarFotoEdificio = (index: number) => {
+    setFotosEdificio(prev => {
       URL.revokeObjectURL(prev[index].previewUrl)
       return prev.filter((_, i) => i !== index)
     })
@@ -107,17 +136,19 @@ export default function NuevaPropiedad() {
     setError(null)
 
     if (fotos.length < MIN_FOTOS) {
-      setError(`Debés seleccionar al menos ${MIN_FOTOS} fotos.`)
+      setError(`Debés seleccionar al menos ${MIN_FOTOS} fotos del apartamento.`)
       return
     }
 
     setEnviando(true)
-    setProgreso({ actual: 0, total: fotos.length })
+    const totalFotos = fotos.length + (mostrarInfoEdificio ? fotosEdificio.length : 0)
+    setProgreso({ actual: 0, total: totalFotos })
 
-    // Subir fotos a Supabase Storage
-    const fotosUrls: string[] = []
     const userId = usuario?.id ?? 'anonimo'
+    const fotosUrls: string[] = []
+    let fotosSubidas = 0
 
+    // Subir fotos del apartamento
     for (let i = 0; i < fotos.length; i++) {
       const { file } = fotos[i]
       const ext = file.name.split('.').pop() ?? 'jpg'
@@ -134,15 +165,43 @@ export default function NuevaPropiedad() {
         return
       }
 
-      const { data: urlData } = supabase.storage
-        .from(BUCKET)
-        .getPublicUrl(uploadData.path)
-
+      const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(uploadData.path)
       fotosUrls.push(urlData.publicUrl)
-      setProgreso({ actual: i + 1, total: fotos.length })
+      fotosSubidas++
+      setProgreso({ actual: fotosSubidas, total: totalFotos })
     }
 
-    // Guardar en base de datos
+    // Subir fotos del edificio
+    const fotosEdificioUrls: string[] = []
+    if (mostrarInfoEdificio) {
+      for (let i = 0; i < fotosEdificio.length; i++) {
+        const { file } = fotosEdificio[i]
+        const ext = file.name.split('.').pop() ?? 'jpg'
+        const path = `edificio/${userId}/${Date.now()}_${i}.${ext}`
+
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from(BUCKET)
+          .upload(path, file, { upsert: false })
+
+        if (uploadError) {
+          setError(`Error subiendo foto del edificio ${i + 1}: ${uploadError.message}`)
+          setEnviando(false)
+          setProgreso(null)
+          return
+        }
+
+        const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(uploadData.path)
+        fotosEdificioUrls.push(urlData.publicUrl)
+        fotosSubidas++
+        setProgreso({ actual: fotosSubidas, total: totalFotos })
+      }
+    }
+
+    // Construir array de amenidades final
+    const amenidadesFinales = mostrarInfoEdificio
+      ? amenidades.map(a => a === 'Otro' ? (amenidadOtro.trim() ? `Otro: ${amenidadOtro.trim()}` : 'Otro') : a)
+      : []
+
     const { error: sbError } = await supabase.from('propiedades').insert({
       titulo: form.titulo,
       tipo: form.tipo,
@@ -163,6 +222,9 @@ export default function NuevaPropiedad() {
       fotos: fotosUrls,
       estado: form.estado,
       publicado_por: usuario?.id ?? null,
+      tiene_info_edificio: mostrarInfoEdificio,
+      amenidades_edificio: amenidadesFinales,
+      fotos_edificio: fotosEdificioUrls,
     })
 
     setEnviando(false)
@@ -276,6 +338,22 @@ export default function NuevaPropiedad() {
                   <option value="en mantenimiento">En mantenimiento</option>
                 </select>
               </div>
+
+              {/* Checkbox condominio — solo para Casa */}
+              {form.tipo === 'Casa' && (
+                <label className="flex items-start gap-3 cursor-pointer p-3 rounded-lg" style={{ backgroundColor: '#F0FFF4', border: '1px solid #9AE6B4' }}>
+                  <input
+                    type="checkbox"
+                    checked={enCondominio}
+                    onChange={e => setEnCondominio(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 rounded"
+                    style={{ accentColor: '#52B788' }}
+                  />
+                  <span className="text-sm" style={{ color: '#2D6A4F', fontWeight: '500' }}>
+                    Esta casa está en condominio o residencial privado
+                  </span>
+                </label>
+              )}
             </div>
           </section>
 
@@ -480,14 +558,13 @@ export default function NuevaPropiedad() {
             />
           </section>
 
-          {/* Fotos */}
+          {/* Fotos del apartamento */}
           <section className="bg-white rounded-xl shadow-sm p-6">
             <h2 className="text-lg font-semibold mb-1" style={{ color: '#1B3A5C' }}>Fotos</h2>
             <p className="text-xs mb-5" style={{ color: '#666' }}>
               Seleccioná entre {MIN_FOTOS} y {MAX_FOTOS} fotos desde tu computadora. Se subirán a Supabase Storage al publicar.
             </p>
 
-            {/* Zona de drop / selección */}
             {fotos.length < MAX_FOTOS && (
               <>
                 <input
@@ -502,12 +579,7 @@ export default function NuevaPropiedad() {
                   type="button"
                   onClick={() => inputFileRef.current?.click()}
                   className="w-full border-2 border-dashed rounded-xl py-8 flex flex-col items-center gap-2 transition-colors"
-                  style={{
-                    borderColor: '#CBD5E0',
-                    backgroundColor: '#FAFAFA',
-                    cursor: 'pointer',
-                    color: '#666',
-                  }}
+                  style={{ borderColor: '#CBD5E0', backgroundColor: '#FAFAFA', cursor: 'pointer', color: '#666' }}
                   onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#52B788')}
                   onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#CBD5E0')}
                 >
@@ -520,44 +592,20 @@ export default function NuevaPropiedad() {
               </>
             )}
 
-            {/* Previews */}
             {fotos.length > 0 && (
               <div className="mt-4 grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))' }}>
                 {fotos.map((foto, i) => (
                   <div key={i} className="relative rounded-lg overflow-hidden" style={{ aspectRatio: '4/3', backgroundColor: '#E2E8F0' }}>
-                    <img
-                      src={foto.previewUrl}
-                      alt={`preview ${i + 1}`}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    />
-                    {/* Número */}
-                    <span style={{
-                      position: 'absolute', top: '6px', left: '6px',
-                      backgroundColor: 'rgba(0,0,0,0.55)', color: 'white',
-                      borderRadius: '999px', padding: '2px 7px', fontSize: '11px', fontWeight: 'bold',
-                    }}>
+                    <img src={foto.previewUrl} alt={`preview ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <span style={{ position: 'absolute', top: '6px', left: '6px', backgroundColor: 'rgba(0,0,0,0.55)', color: 'white', borderRadius: '999px', padding: '2px 7px', fontSize: '11px', fontWeight: 'bold' }}>
                       {i + 1}
                     </span>
-                    {/* Quitar */}
                     <button
                       type="button"
                       onClick={() => quitarFoto(i)}
-                      style={{
-                        position: 'absolute', top: '6px', right: '6px',
-                        backgroundColor: 'rgba(229,62,62,0.85)', color: 'white',
-                        border: 'none', borderRadius: '50%', width: '22px', height: '22px',
-                        fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      }}
-                    >
-                      ✕
-                    </button>
-                    {/* Nombre del archivo */}
-                    <div style={{
-                      position: 'absolute', bottom: 0, left: 0, right: 0,
-                      backgroundColor: 'rgba(0,0,0,0.5)', color: 'white',
-                      fontSize: '10px', padding: '3px 6px',
-                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                    }}>
+                      style={{ position: 'absolute', top: '6px', right: '6px', backgroundColor: 'rgba(229,62,62,0.85)', color: 'white', border: 'none', borderRadius: '50%', width: '22px', height: '22px', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    >✕</button>
+                    <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.5)', color: 'white', fontSize: '10px', padding: '3px 6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {foto.file.name}
                     </div>
                   </div>
@@ -565,7 +613,6 @@ export default function NuevaPropiedad() {
               </div>
             )}
 
-            {/* Contador y validación */}
             <div className="mt-3 flex items-center justify-between">
               <span className="text-xs" style={{ color: fotos.length < MIN_FOTOS ? '#e53e3e' : '#2D6A4F', fontWeight: '500' }}>
                 {fotos.length < MIN_FOTOS
@@ -577,26 +624,126 @@ export default function NuevaPropiedad() {
                 <span className="text-xs" style={{ color: '#999' }}>Límite máximo alcanzado</span>
               )}
             </div>
-
-            {/* Barra de progreso de subida */}
-            {progreso && (
-              <div className="mt-4">
-                <div className="flex justify-between text-xs mb-1" style={{ color: '#555' }}>
-                  <span>Subiendo foto {progreso.actual} de {progreso.total}...</span>
-                  <span>{porcentaje}%</span>
-                </div>
-                <div className="w-full rounded-full overflow-hidden" style={{ height: '8px', backgroundColor: '#E2E8F0' }}>
-                  <div
-                    style={{
-                      height: '100%', backgroundColor: '#52B788',
-                      width: `${porcentaje}%`, transition: 'width 0.3s ease',
-                      borderRadius: '999px',
-                    }}
-                  />
-                </div>
-              </div>
-            )}
           </section>
+
+          {/* ── SECCIÓN EDIFICIO / CONDOMINIO (condicional) ── */}
+          {mostrarInfoEdificio && (
+            <section className="bg-white rounded-xl shadow-sm p-6" style={{ border: '2px solid #C6F6D5' }}>
+              <div className="mb-5">
+                <h2 className="text-lg font-semibold" style={{ color: '#1B3A5C' }}>{seccionLabel}</h2>
+                <p className="text-xs mt-1" style={{ color: '#666' }}>Esta sección es opcional. Podés completarla para dar más información a los inquilinos.</p>
+              </div>
+
+              {/* Amenidades */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium mb-3" style={{ color: '#333' }}>
+                  Amenidades del {form.tipo === 'Apartamento' ? 'edificio' : 'condominio/residencial'}
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {AMENIDADES_LIST.map(amenidad => (
+                    <label key={amenidad} className="flex items-center gap-2 cursor-pointer p-2 rounded-lg" style={{ border: '1px solid', borderColor: amenidades.includes(amenidad) ? '#52B788' : '#E2E8F0', backgroundColor: amenidades.includes(amenidad) ? '#F0FFF4' : 'white' }}>
+                      <input
+                        type="checkbox"
+                        checked={amenidades.includes(amenidad)}
+                        onChange={() => toggleAmenidad(amenidad)}
+                        className="w-4 h-4 rounded"
+                        style={{ accentColor: '#52B788' }}
+                      />
+                      <span className="text-sm" style={{ color: '#333' }}>{amenidad}</span>
+                    </label>
+                  ))}
+                </div>
+
+                {amenidades.includes('Otro') && (
+                  <div className="mt-3">
+                    <input
+                      type="text"
+                      value={amenidadOtro}
+                      onChange={e => setAmenidadOtro(e.target.value)}
+                      placeholder="Describí la amenidad adicional..."
+                      className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none"
+                      style={{ borderColor: '#CBD5E0' }}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Fotos del edificio */}
+              <div>
+                <h3 className="text-sm font-semibold mb-1" style={{ color: '#333' }}>Fotos del edificio</h3>
+                <p className="text-xs mb-4" style={{ color: '#E53E3E', fontWeight: '500' }}>
+                  Estas fotos son del edificio/áreas comunes, NO del apartamento
+                </p>
+
+                {fotosEdificio.length < MAX_FOTOS_EDIFICIO && (
+                  <>
+                    <input
+                      ref={inputEdificioRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handleSeleccionarEdificio}
+                      style={{ display: 'none' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => inputEdificioRef.current?.click()}
+                      className="w-full border-2 border-dashed rounded-xl py-6 flex flex-col items-center gap-2 transition-colors"
+                      style={{ borderColor: '#CBD5E0', backgroundColor: '#FAFAFA', cursor: 'pointer', color: '#666' }}
+                      onMouseEnter={e => (e.currentTarget.style.borderColor = '#52B788')}
+                      onMouseLeave={e => (e.currentTarget.style.borderColor = '#CBD5E0')}
+                    >
+                      <span style={{ fontSize: '28px' }}>🏢</span>
+                      <span className="text-sm font-medium">Agregar fotos del edificio (opcional)</span>
+                      <span className="text-xs" style={{ color: '#999' }}>
+                        JPG, PNG, WEBP — {fotosEdificio.length}/{MAX_FOTOS_EDIFICIO} seleccionadas
+                      </span>
+                    </button>
+                  </>
+                )}
+
+                {fotosEdificio.length > 0 && (
+                  <div className="mt-4 grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))' }}>
+                    {fotosEdificio.map((foto, i) => (
+                      <div key={i} className="relative rounded-lg overflow-hidden" style={{ aspectRatio: '4/3', backgroundColor: '#E2E8F0' }}>
+                        <img src={foto.previewUrl} alt={`edificio ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <span style={{ position: 'absolute', top: '6px', left: '6px', backgroundColor: 'rgba(0,0,0,0.55)', color: 'white', borderRadius: '999px', padding: '2px 7px', fontSize: '11px', fontWeight: 'bold' }}>
+                          {i + 1}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => quitarFotoEdificio(i)}
+                          style={{ position: 'absolute', top: '6px', right: '6px', backgroundColor: 'rgba(229,62,62,0.85)', color: 'white', border: 'none', borderRadius: '50%', width: '22px', height: '22px', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        >✕</button>
+                        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.5)', color: 'white', fontSize: '10px', padding: '3px 6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {foto.file.name}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {fotosEdificio.length > 0 && (
+                  <p className="text-xs mt-2" style={{ color: '#2D6A4F', fontWeight: '500' }}>
+                    ✓ {fotosEdificio.length} foto{fotosEdificio.length !== 1 ? 's' : ''} del edificio
+                  </p>
+                )}
+              </div>
+            </section>
+          )}
+
+          {/* Barra de progreso */}
+          {progreso && (
+            <div className="bg-white rounded-xl shadow-sm p-4">
+              <div className="flex justify-between text-xs mb-1" style={{ color: '#555' }}>
+                <span>Subiendo foto {progreso.actual} de {progreso.total}...</span>
+                <span>{porcentaje}%</span>
+              </div>
+              <div className="w-full rounded-full overflow-hidden" style={{ height: '8px', backgroundColor: '#E2E8F0' }}>
+                <div style={{ height: '100%', backgroundColor: '#52B788', width: `${porcentaje}%`, transition: 'width 0.3s ease', borderRadius: '999px' }} />
+              </div>
+            </div>
+          )}
 
           {/* Error */}
           {error && (
