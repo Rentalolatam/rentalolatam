@@ -113,6 +113,14 @@ export default function Navbar({ extraLinks }: NavbarProps) {
         {usuario ? (
           <>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {usuario.foto ? (
+                <img
+                  src={usuario.foto}
+                  alt={usuario.nombre}
+                  referrerPolicy="no-referrer"
+                  style={{ width: '30px', height: '30px', borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(255,255,255,0.4)' }}
+                />
+              ) : null}
               <span style={{ color: 'white', fontSize: '14px', fontWeight: '500' }}>
                 {usuario.nombre}
               </span>
