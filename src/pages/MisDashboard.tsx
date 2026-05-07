@@ -6,26 +6,58 @@ import { useAuth } from '../context/AuthContext'
 
 const BADGE_PUBLICACION: Record<string, { label: string; bg: string; color: string }> = {
   activa:    { label: 'Activa',    bg: '#F0FFF4', color: '#2D6A4F' },
-  alquilada: { label: 'Alquilada', bg: '#EBF8FF', color: '#2B6CB0' },
-  inactiva:  { label: 'Inactiva',  bg: '#F7FAFC', color: '#718096' },
+  alquilada: { label: 'Alquilada', bg: '#FFF3E0', color: '#C05621' },
+  inactiva:  { label: 'Archivada', bg: '#F7FAFC', color: '#718096' },
 }
 
+type ModalTipo = 'alquilar' | 'archivar' | 'activar'
+
 type ModalConfirm = {
-  tipo: 'baja' | 'eliminar'
+  tipo: ModalTipo
   propiedad: Propiedad
+}
+
+const MODAL_CONFIG: Record<ModalTipo, {
+  icono: string
+  titulo: string
+  descripcion: string
+  btnLabel: string
+  btnColor: string
+}> = {
+  alquilar: {
+    icono: '🏠',
+    titulo: 'Marcar como alquilada',
+    descripcion: 'Esta propiedad se marcará como alquilada y dejará de aparecer en el marketplace.',
+    btnLabel: 'Marcar como alquilada',
+    btnColor: '#DD6B20',
+  },
+  archivar: {
+    icono: '📦',
+    titulo: 'Archivar propiedad',
+    descripcion: 'Esta propiedad se archivará y dejará de aparecer en el marketplace y en tu dashboard activo.',
+    btnLabel: 'Archivar',
+    btnColor: '#718096',
+  },
+  activar: {
+    icono: '✅',
+    titulo: 'Volver a activar',
+    descripcion: 'Esta propiedad volverá a aparecer en el marketplace como disponible.',
+    btnLabel: 'Activar',
+    btnColor: '#2D6A4F',
+  },
 }
 
 export default function MisDashboard() {
   const { usuario } = useAuth()
   const navigate = useNavigate()
 
-  const [propiedades, setPropiedades]   = useState<Propiedad[]>([])
-  const [cargando, setCargando]         = useState(true)
-  const [error, setError]               = useState<string | null>(null)
-  const [modal, setModal]               = useState<ModalConfirm | null>(null)
-  const [procesando, setProcesando]     = useState(false)
-  const [msgOk, setMsgOk]              = useState<string | null>(null)
-
+  const [propiedades, setPropiedades]       = useState<Propiedad[]>([])
+  const [cargando, setCargando]             = useState(true)
+  const [error, setError]                   = useState<string | null>(null)
+  const [modal, setModal]                   = useState<ModalConfirm | null>(null)
+  const [procesando, setProcesando]         = useState(false)
+  const [msgOk, setMsgOk]                  = useState<string | null>(null)
+  const [mostrarArchivadas, setMostrarArchivadas] = useState(false)
   const [inquilinosActivos, setInquilinosActivos] = useState(0)
 
   useEffect(() => {
@@ -51,60 +83,45 @@ export default function MisDashboard() {
         .eq('estado', 'activa'),
     ])
 
-    if (propsErr) {
-      setError(propsErr.message)
-    } else {
-      setPropiedades((props as Propiedad[]) ?? [])
-    }
+    if (propsErr) setError(propsErr.message)
+    else setPropiedades((props as Propiedad[]) ?? [])
+
     setInquilinosActivos(inquCount ?? 0)
     setCargando(false)
   }
 
-  const totalProps     = propiedades.length
-  const disponibles    = propiedades.filter(p => (p.estado_publicacion ?? 'activa') === 'activa' && p.estado === 'disponible').length
-  const alquiladas     = propiedades.filter(p => p.estado_publicacion === 'alquilada' || p.estado === 'arrendado').length
-  const inactivas      = propiedades.filter(p => p.estado_publicacion === 'inactiva').length
+  const activas    = propiedades.filter(p => (p.estado_publicacion ?? 'activa') === 'activa')
+  const alquiladas = propiedades.filter(p => p.estado_publicacion === 'alquilada')
+  const archivadas = propiedades.filter(p => p.estado_publicacion === 'inactiva')
 
-  const handleDarDeBaja = async (prop: Propiedad) => {
-    setProcesando(true)
-    const { error: err } = await supabase
-      .from('propiedades')
-      .update({ estado_publicacion: 'inactiva' })
-      .eq('id', prop.id)
-
-    setProcesando(false)
-    setModal(null)
-    if (err) {
-      setError(err.message)
-    } else {
-      setMsgOk(`"${prop.titulo}" fue dada de baja correctamente.`)
-      await cargarDatos()
-      setTimeout(() => setMsgOk(null), 4000)
-    }
-  }
-
-  const handleEliminar = async (prop: Propiedad) => {
-    setProcesando(true)
-    const { error: err } = await supabase
-      .from('propiedades')
-      .delete()
-      .eq('id', prop.id)
-
-    setProcesando(false)
-    setModal(null)
-    if (err) {
-      setError(err.message)
-    } else {
-      setMsgOk(`"${prop.titulo}" fue eliminada permanentemente.`)
-      await cargarDatos()
-      setTimeout(() => setMsgOk(null), 4000)
-    }
-  }
-
-  const confirmar = () => {
+  const ejecutarAccion = async () => {
     if (!modal) return
-    if (modal.tipo === 'baja') handleDarDeBaja(modal.propiedad)
-    else handleEliminar(modal.propiedad)
+    setProcesando(true)
+
+    const nuevoEstado =
+      modal.tipo === 'alquilar' ? 'alquilada' :
+      modal.tipo === 'archivar' ? 'inactiva'  : 'activa'
+
+    const { error: err } = await supabase
+      .from('propiedades')
+      .update({ estado_publicacion: nuevoEstado })
+      .eq('id', modal.propiedad.id)
+
+    setProcesando(false)
+    setModal(null)
+
+    if (err) {
+      setError(err.message)
+    } else {
+      const msgs: Record<ModalTipo, string> = {
+        alquilar: `"${modal.propiedad.titulo}" marcada como alquilada.`,
+        archivar: `"${modal.propiedad.titulo}" archivada correctamente.`,
+        activar:  `"${modal.propiedad.titulo}" activada y visible en el marketplace.`,
+      }
+      setMsgOk(msgs[modal.tipo])
+      await cargarDatos()
+      setTimeout(() => setMsgOk(null), 4000)
+    }
   }
 
   return (
@@ -122,12 +139,12 @@ export default function MisDashboard() {
       <div className="max-w-6xl mx-auto px-6 py-10">
 
         {/* STATS */}
-        <div className="grid grid-cols-2 gap-4 mb-10" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+        <div className="grid gap-4 mb-10" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
           {[
-            { label: 'Total propiedades', valor: totalProps,        color: '#1B3A5C', bg: 'white' },
-            { label: 'Disponibles',       valor: disponibles,       color: '#2D6A4F', bg: '#F0FFF4' },
-            { label: 'Alquiladas',        valor: alquiladas,        color: '#2B6CB0', bg: '#EBF8FF' },
-            { label: 'Inquilinos activos',valor: inquilinosActivos, color: '#7B341E', bg: '#FFFAF0' },
+            { label: 'Total propiedades',  valor: propiedades.length, color: '#1B3A5C', bg: 'white' },
+            { label: 'Activas',            valor: activas.length,     color: '#2D6A4F', bg: '#F0FFF4' },
+            { label: 'Alquiladas',         valor: alquiladas.length,  color: '#C05621', bg: '#FFF3E0' },
+            { label: 'Inquilinos activos', valor: inquilinosActivos,  color: '#7B341E', bg: '#FFFAF0' },
           ].map(s => (
             <div key={s.label} className="rounded-xl p-5 shadow-sm" style={{ backgroundColor: s.bg, border: '1px solid #E2E8F0' }}>
               <div className="text-3xl font-bold mb-1" style={{ color: s.color }}>{cargando ? '—' : s.valor}</div>
@@ -162,58 +179,42 @@ export default function MisDashboard() {
             <div className="text-5xl mb-4">🏠</div>
             <h2 className="text-xl font-semibold mb-2" style={{ color: '#1B3A5C' }}>Todavía no publicaste propiedades</h2>
             <p className="text-sm mb-6" style={{ color: '#666' }}>Publicá tu primera propiedad y comenzá a recibir solicitudes</p>
-            <Link
-              to="/propiedades/nueva"
-              className="inline-block px-8 py-3 rounded-lg text-sm font-bold text-white"
-              style={{ backgroundColor: '#52B788' }}
-            >
+            <Link to="/propiedades/nueva" className="inline-block px-8 py-3 rounded-lg text-sm font-bold text-white" style={{ backgroundColor: '#52B788' }}>
               Publicar propiedad
             </Link>
           </div>
         )}
 
-        {/* CARDS */}
-        {!cargando && propiedades.length > 0 && (
+        {/* PROPIEDADES ACTIVAS + ALQUILADAS */}
+        {!cargando && (activas.length > 0 || alquiladas.length > 0) && (
           <>
             <div className="flex justify-between items-center mb-5">
               <h2 className="text-xl font-semibold" style={{ color: '#1B3A5C' }}>
-                Tus propiedades ({propiedades.length})
+                Tus propiedades ({activas.length + alquiladas.length})
               </h2>
-              <Link
-                to="/propiedades/nueva"
-                className="text-sm font-bold px-5 py-2 rounded-lg text-white"
-                style={{ backgroundColor: '#52B788' }}
-              >
+              <Link to="/propiedades/nueva" className="text-sm font-bold px-5 py-2 rounded-lg text-white" style={{ backgroundColor: '#52B788' }}>
                 + Nueva propiedad
               </Link>
             </div>
 
             <div className="grid gap-6" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))' }}>
-              {propiedades.map(prop => {
+              {[...activas, ...alquiladas].map(prop => {
                 const pub = prop.estado_publicacion ?? 'activa'
                 const badge = BADGE_PUBLICACION[pub] ?? BADGE_PUBLICACION['activa']
                 const foto = prop.fotos?.[0]
+                const esAlquilada = pub === 'alquilada'
 
                 return (
-                  <div
-                    key={prop.id}
-                    className="bg-white rounded-xl shadow-sm overflow-hidden"
-                    style={{ border: '1px solid #E2E8F0' }}
-                  >
+                  <div key={prop.id} className="bg-white rounded-xl shadow-sm overflow-hidden" style={{ border: '1px solid #E2E8F0' }}>
                     {/* Foto */}
                     <div style={{ height: '180px', backgroundColor: '#CBD5E0', position: 'relative', overflow: 'hidden' }}>
                       {foto ? (
-                        <img
-                          src={foto}
-                          alt={prop.titulo}
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        />
+                        <img src={foto} alt={prop.titulo} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       ) : (
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#718096', fontSize: '13px' }}>
                           Sin foto
                         </div>
                       )}
-                      {/* Badge publicación */}
                       <span style={{
                         position: 'absolute', top: '10px', right: '10px',
                         fontSize: '11px', fontWeight: 'bold', padding: '3px 10px',
@@ -241,131 +242,155 @@ export default function MisDashboard() {
                       </div>
 
                       {/* Acciones */}
-                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                        <button
-                          onClick={() => navigate(`/propiedades/${prop.id}`)}
-                          style={{
-                            flex: '1', padding: '8px 0', borderRadius: '7px', fontSize: '12px', fontWeight: '600',
-                            backgroundColor: '#EBF8FF', color: '#2B6CB0', border: 'none', cursor: 'pointer',
-                          }}
-                        >
-                          Ver detalle
-                        </button>
-
-                        <button
-                          onClick={() => navigate(`/propiedades/${prop.id}/editar`)}
-                          style={{
-                            flex: '1', padding: '8px 0', borderRadius: '7px', fontSize: '12px', fontWeight: '600',
-                            backgroundColor: '#F0FFF4', color: '#2D6A4F', border: 'none', cursor: 'pointer',
-                          }}
-                        >
-                          Editar
-                        </button>
-
-                        {pub !== 'inactiva' ? (
+                      {esAlquilada ? (
+                        /* Propiedad alquilada: solo Ver detalle + Volver a activar */
+                        <div style={{ display: 'flex', gap: '8px' }}>
                           <button
-                            onClick={() => setModal({ tipo: 'baja', propiedad: prop })}
-                            style={{
-                              flex: '1', padding: '8px 0', borderRadius: '7px', fontSize: '12px', fontWeight: '600',
-                              backgroundColor: '#FFFBEB', color: '#92400E', border: 'none', cursor: 'pointer',
-                            }}
+                            onClick={() => navigate(`/propiedades/${prop.id}`)}
+                            style={{ flex: 1, padding: '8px 0', borderRadius: '7px', fontSize: '12px', fontWeight: '600', backgroundColor: '#EBF8FF', color: '#2B6CB0', border: 'none', cursor: 'pointer' }}
                           >
-                            Dar de baja
+                            Ver detalle
                           </button>
-                        ) : (
                           <button
-                            onClick={() => setModal({ tipo: 'eliminar', propiedad: prop })}
-                            style={{
-                              flex: '1', padding: '8px 0', borderRadius: '7px', fontSize: '12px', fontWeight: '600',
-                              backgroundColor: '#FFF5F5', color: '#c53030', border: 'none', cursor: 'pointer',
-                            }}
+                            onClick={() => setModal({ tipo: 'activar', propiedad: prop })}
+                            style={{ flex: 1, padding: '8px 0', borderRadius: '7px', fontSize: '12px', fontWeight: '600', backgroundColor: '#F0FFF4', color: '#2D6A4F', border: 'none', cursor: 'pointer' }}
                           >
-                            Eliminar
+                            Volver a activar
                           </button>
-                        )}
-                      </div>
+                        </div>
+                      ) : (
+                        /* Propiedad activa: Ver detalle + Editar + Marcar alquilada + Archivar */
+                        <>
+                          <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                            <button
+                              onClick={() => navigate(`/propiedades/${prop.id}`)}
+                              style={{ flex: 1, padding: '8px 0', borderRadius: '7px', fontSize: '12px', fontWeight: '600', backgroundColor: '#EBF8FF', color: '#2B6CB0', border: 'none', cursor: 'pointer' }}
+                            >
+                              Ver detalle
+                            </button>
+                            <button
+                              onClick={() => navigate(`/propiedades/${prop.id}/editar`)}
+                              style={{ flex: 1, padding: '8px 0', borderRadius: '7px', fontSize: '12px', fontWeight: '600', backgroundColor: '#F0FFF4', color: '#2D6A4F', border: 'none', cursor: 'pointer' }}
+                            >
+                              Editar
+                            </button>
+                            <button
+                              onClick={() => setModal({ tipo: 'alquilar', propiedad: prop })}
+                              style={{ flex: 1, padding: '8px 0', borderRadius: '7px', fontSize: '12px', fontWeight: '600', backgroundColor: '#FFF3E0', color: '#C05621', border: 'none', cursor: 'pointer' }}
+                            >
+                              Marcar alquilada
+                            </button>
+                          </div>
+                          <button
+                            onClick={() => setModal({ tipo: 'archivar', propiedad: prop })}
+                            style={{ width: '100%', padding: '6px 0', borderRadius: '7px', fontSize: '11px', fontWeight: '500', backgroundColor: 'transparent', color: '#A0AEC0', border: '1px solid #E2E8F0', cursor: 'pointer' }}
+                          >
+                            Archivar
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 )
               })}
             </div>
-
-            {inactivas > 0 && (
-              <p className="text-sm mt-6 text-center" style={{ color: '#999' }}>
-                {inactivas} propiedad{inactivas !== 1 ? 'es' : ''} dada{inactivas !== 1 ? 's' : ''} de baja (no visible{inactivas !== 1 ? 's' : ''} en el listado público)
-              </p>
-            )}
           </>
+        )}
+
+        {/* SECCIÓN ARCHIVADAS (colapsable) */}
+        {!cargando && archivadas.length > 0 && (
+          <div style={{ marginTop: '40px' }}>
+            <button
+              onClick={() => setMostrarArchivadas(v => !v)}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+            >
+              <span style={{ color: '#718096', fontSize: '14px', fontWeight: '600' }}>
+                {mostrarArchivadas ? '▾' : '▸'} Archivadas ({archivadas.length})
+              </span>
+            </button>
+
+            {mostrarArchivadas && (
+              <div className="grid gap-4 mt-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))' }}>
+                {archivadas.map(prop => {
+                  const foto = prop.fotos?.[0]
+                  return (
+                    <div key={prop.id} className="bg-white rounded-xl overflow-hidden" style={{ border: '1px solid #E2E8F0', opacity: 0.75 }}>
+                      <div style={{ height: '120px', backgroundColor: '#E2E8F0', position: 'relative', overflow: 'hidden' }}>
+                        {foto ? (
+                          <img src={foto} alt={prop.titulo} style={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'grayscale(60%)' }} />
+                        ) : (
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#A0AEC0', fontSize: '12px' }}>Sin foto</div>
+                        )}
+                        <span style={{
+                          position: 'absolute', top: '8px', right: '8px',
+                          fontSize: '10px', fontWeight: 'bold', padding: '2px 8px',
+                          borderRadius: '999px', backgroundColor: '#F7FAFC', color: '#718096',
+                        }}>
+                          Archivada
+                        </span>
+                      </div>
+                      <div style={{ padding: '14px' }}>
+                        <h3 style={{ color: '#718096', fontSize: '14px', fontWeight: '600', marginBottom: '10px' }}>{prop.titulo}</h3>
+                        <button
+                          onClick={() => setModal({ tipo: 'activar', propiedad: prop })}
+                          style={{ width: '100%', padding: '7px 0', borderRadius: '7px', fontSize: '12px', fontWeight: '600', backgroundColor: '#F0FFF4', color: '#2D6A4F', border: '1px solid #9AE6B4', cursor: 'pointer' }}
+                        >
+                          Restaurar
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
         )}
       </div>
 
       {/* MODAL CONFIRMACIÓN */}
-      {modal && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 50,
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: '20px',
-        }}>
+      {modal && (() => {
+        const cfg = MODAL_CONFIG[modal.tipo]
+        return (
           <div style={{
-            backgroundColor: 'white', borderRadius: '16px', padding: '32px',
-            maxWidth: '420px', width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+            position: 'fixed', inset: 0, zIndex: 50,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '20px',
           }}>
-            {modal.tipo === 'eliminar' ? (
-              <>
-                <div style={{ fontSize: '40px', textAlign: 'center', marginBottom: '12px' }}>⚠️</div>
-                <h3 style={{ color: '#1B3A5C', fontSize: '18px', fontWeight: 'bold', textAlign: 'center', marginBottom: '12px' }}>
-                  Eliminar propiedad
-                </h3>
-                <p style={{ color: '#555', fontSize: '14px', textAlign: 'center', marginBottom: '8px' }}>
-                  Esta acción <strong>no se puede deshacer</strong>. Se eliminará permanentemente:
-                </p>
-                <p style={{ color: '#1B3A5C', fontSize: '14px', fontWeight: '600', textAlign: 'center', marginBottom: '24px' }}>
-                  "{modal.propiedad.titulo}"
-                </p>
-              </>
-            ) : (
-              <>
-                <div style={{ fontSize: '40px', textAlign: 'center', marginBottom: '12px' }}>📤</div>
-                <h3 style={{ color: '#1B3A5C', fontSize: '18px', fontWeight: 'bold', textAlign: 'center', marginBottom: '12px' }}>
-                  Dar de baja la propiedad
-                </h3>
-                <p style={{ color: '#555', fontSize: '14px', textAlign: 'center', marginBottom: '8px' }}>
-                  La propiedad ya no será visible en el listado público:
-                </p>
-                <p style={{ color: '#1B3A5C', fontSize: '14px', fontWeight: '600', textAlign: 'center', marginBottom: '24px' }}>
-                  "{modal.propiedad.titulo}"
-                </p>
-              </>
-            )}
-
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button
-                onClick={() => setModal(null)}
-                disabled={procesando}
-                style={{
-                  flex: 1, padding: '12px', borderRadius: '8px', fontSize: '14px', fontWeight: '600',
-                  backgroundColor: 'white', color: '#555', border: '1px solid #CBD5E0', cursor: 'pointer',
-                }}
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={confirmar}
-                disabled={procesando}
-                style={{
-                  flex: 1, padding: '12px', borderRadius: '8px', fontSize: '14px', fontWeight: '600',
-                  backgroundColor: modal.tipo === 'eliminar' ? '#c53030' : '#DD6B20',
-                  color: 'white', border: 'none', cursor: procesando ? 'not-allowed' : 'pointer',
-                  opacity: procesando ? 0.7 : 1,
-                }}
-              >
-                {procesando ? 'Procesando...' : modal.tipo === 'eliminar' ? 'Eliminar definitivamente' : 'Dar de baja'}
-              </button>
+            <div style={{
+              backgroundColor: 'white', borderRadius: '16px', padding: '32px',
+              maxWidth: '420px', width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+            }}>
+              <div style={{ fontSize: '40px', textAlign: 'center', marginBottom: '12px' }}>{cfg.icono}</div>
+              <h3 style={{ color: '#1B3A5C', fontSize: '18px', fontWeight: 'bold', textAlign: 'center', marginBottom: '12px' }}>
+                {cfg.titulo}
+              </h3>
+              <p style={{ color: '#555', fontSize: '14px', textAlign: 'center', marginBottom: '8px' }}>
+                {cfg.descripcion}
+              </p>
+              <p style={{ color: '#1B3A5C', fontSize: '14px', fontWeight: '600', textAlign: 'center', marginBottom: '24px' }}>
+                "{modal.propiedad.titulo}"
+              </p>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button
+                  onClick={() => setModal(null)}
+                  disabled={procesando}
+                  style={{ flex: 1, padding: '12px', borderRadius: '8px', fontSize: '14px', fontWeight: '600', backgroundColor: 'white', color: '#555', border: '1px solid #CBD5E0', cursor: 'pointer' }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={ejecutarAccion}
+                  disabled={procesando}
+                  style={{ flex: 1, padding: '12px', borderRadius: '8px', fontSize: '14px', fontWeight: '600', backgroundColor: cfg.btnColor, color: 'white', border: 'none', cursor: procesando ? 'not-allowed' : 'pointer', opacity: procesando ? 0.7 : 1 }}
+                >
+                  {procesando ? 'Procesando...' : cfg.btnLabel}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
     </div>
   )
 }
