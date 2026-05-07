@@ -20,6 +20,7 @@ export default function Propiedades() {
       const { data, error: sbError } = await supabase
         .from('propiedades')
         .select('*')
+        .or('estado_publicacion.eq.activa,estado_publicacion.is.null')
         .order('created_at', { ascending: false })
 
       if (sbError) {

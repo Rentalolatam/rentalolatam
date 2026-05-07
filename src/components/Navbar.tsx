@@ -24,6 +24,7 @@ export default function Navbar({ extraLinks }: NavbarProps) {
     if (!usuario) {
       setTienePropiedades(false)
       setTieneArriendo(false)
+      setTieneContratos(false)
       return
     }
 
@@ -74,6 +75,12 @@ export default function Navbar({ extraLinks }: NavbarProps) {
         <Link to="/propiedades" style={{ color: 'white', textDecoration: 'none', fontSize: '14px' }}>
           Propiedades
         </Link>
+
+        {tienePropiedades && (
+          <Link to="/dashboard" style={{ color: 'white', textDecoration: 'none', fontSize: '14px' }}>
+            Mi dashboard
+          </Link>
+        )}
 
         {tienePropiedades && (
           <Link to="/inquilinos" style={{ color: 'white', textDecoration: 'none', fontSize: '14px' }}>

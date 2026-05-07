@@ -10,6 +10,8 @@ import NuevoInquilino from './pages/NuevoInquilino'
 import DetalleInquilino from './pages/DetalleInquilino'
 import MiArriendo from './pages/MiArriendo'
 import Contratos from './pages/Contratos'
+import MisDashboard from './pages/MisDashboard'
+import EditarPropiedad from './pages/EditarPropiedad'
 import Login from './pages/Login'
 import Registro from './pages/Registro'
 
@@ -188,6 +190,8 @@ function App() {
           <Route path="/inquilinos/:id" element={<ProtectedRoute><DetalleInquilino /></ProtectedRoute>} />
           <Route path="/mi-arriendo" element={<ProtectedRoute><MiArriendo /></ProtectedRoute>} />
           <Route path="/contratos" element={<ProtectedRoute><Contratos /></ProtectedRoute>} />
+          <Route path="/dashboard" element={<ProtectedRoute><MisDashboard /></ProtectedRoute>} />
+          <Route path="/propiedades/:id/editar" element={<ProtectedRoute><EditarPropiedad /></ProtectedRoute>} />
           <Route
             path="/propiedades/nueva"
             element={
