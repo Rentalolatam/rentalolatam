@@ -49,10 +49,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const expiresAt = new Date(Date.now() + token.expires_in * 1_000).toISOString()
 
-  const supabase = createClient(
-    process.env['VITE_SUPABASE_URL']!,
-    process.env['SUPABASE_SERVICE_ROLE_KEY']!,
-  )
+  const supabaseUrl = process.env['SUPABASE_URL'] ?? process.env['VITE_SUPABASE_URL'] ?? 'https://bfnoeieminbxarkgwenu.supabase.co'
+  const supabaseKey = process.env['SUPABASE_SERVICE_ROLE_KEY'] ?? process.env['VITE_SUPABASE_ANON_KEY'] ?? ''
+
+  const supabase = createClient(supabaseUrl, supabaseKey)
 
   const { error } = await supabase.from('docusign_tokens').upsert(
     {
