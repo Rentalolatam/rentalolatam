@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
-const DOCUSIGN_BASE = 'https://demo.docusign.net'
+const DOCUSIGN_BASE = 'https://account-d.docusign.com'
 
 export default function handler(req: VercelRequest, res: VercelResponse) {
   const userId = req.query['user_id'] as string | undefined

@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 
-const DOCUSIGN_BASE = 'https://demo.docusign.net'
+const DOCUSIGN_BASE = 'https://account-d.docusign.com'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const code    = req.query['code']  as string | undefined
