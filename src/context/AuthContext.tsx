@@ -7,6 +7,7 @@ export type PerfilUsuario = {
   email: string
   nombre: string
   tipo: 'Propietario' | 'Inquilino'
+  foto: string | null
 }
 
 type AuthContextType = {
@@ -23,8 +24,14 @@ function mapUser(user: User): PerfilUsuario {
   return {
     id: user.id,
     email: user.email ?? '',
-    nombre: (user.user_metadata?.nombre as string | undefined) ?? user.email ?? '',
+    nombre: (user.user_metadata?.nombre as string | undefined)
+      ?? (user.user_metadata?.full_name as string | undefined)
+      ?? user.email
+      ?? '',
     tipo: (user.user_metadata?.tipo as 'Propietario' | 'Inquilino' | undefined) ?? 'Inquilino',
+    foto: (user.user_metadata?.avatar_url as string | undefined)
+      ?? (user.user_metadata?.picture as string | undefined)
+      ?? null,
   }
 }
 

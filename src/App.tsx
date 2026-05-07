@@ -14,6 +14,7 @@ import MisDashboard from './pages/MisDashboard'
 import EditarPropiedad from './pages/EditarPropiedad'
 import Login from './pages/Login'
 import Registro from './pages/Registro'
+import AuthCallback from './pages/AuthCallback'
 
 function LandingPage() {
   const { usuario, logout } = useAuth()
@@ -185,6 +186,7 @@ function App() {
           <Route path="/propiedades/:id" element={<DetallePropiedad />} />
           <Route path="/login" element={<Login />} />
           <Route path="/registro" element={<Registro />} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/inquilinos" element={<ProtectedRoute><Inquilinos /></ProtectedRoute>} />
           <Route path="/inquilinos/nuevo" element={<ProtectedRoute><NuevoInquilino /></ProtectedRoute>} />
           <Route path="/inquilinos/:id" element={<ProtectedRoute><DetalleInquilino /></ProtectedRoute>} />
