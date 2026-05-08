@@ -29,6 +29,8 @@ export type Propiedad = {
   amenidades_edificio: string[] | null
   fotos_edificio: string[] | null
   tiene_info_edificio: boolean | null
+  departamento: string | null
+  municipio: string | null
   publicado_por: string | null
   created_at: string
 }

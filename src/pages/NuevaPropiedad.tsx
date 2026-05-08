@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import Navbar from '../components/Navbar'
 import { useAuth } from '../context/AuthContext'
+import { DEPARTAMENTOS_GUATEMALA, ZONAS_CIUDAD_GUATEMALA, PAISES } from '../data/geografia'
 
 const TIPO_CAMBIO = 7.75
 const MIN_FOTOS = 3
@@ -24,6 +25,8 @@ type FormData = {
   titulo: string
   tipo: string
   pais: string
+  departamento: string
+  municipio: string
   zona: string
   precio_quetzales: string
   incluye_iva: boolean
@@ -48,6 +51,8 @@ const initialForm: FormData = {
   titulo: '',
   tipo: 'Apartamento',
   pais: 'Guatemala',
+  departamento: '',
+  municipio: '',
   zona: '',
   precio_quetzales: '',
   incluye_iva: false,
@@ -206,7 +211,9 @@ export default function NuevaPropiedad() {
       titulo: form.titulo,
       tipo: form.tipo,
       pais: form.pais,
-      zona: form.zona,
+      departamento: form.departamento || null,
+      municipio: form.municipio || null,
+      zona: form.zona || null,
       precio_quetzales: parseFloat(form.precio_quetzales),
       precio_dolares: parseFloat(precioDolares),
       incluye_iva: form.incluye_iva,
@@ -297,29 +304,93 @@ export default function NuevaPropiedad() {
                   <select
                     name="pais"
                     value={form.pais}
-                    onChange={handleChange}
+                    onChange={e => setForm(prev => ({ ...prev, pais: e.target.value, departamento: '', municipio: '', zona: '' }))}
                     className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none"
                     style={{ borderColor: '#CBD5E0' }}
                   >
-                    <option>Guatemala</option>
+                    {PAISES.map(p => <option key={p}>{p}</option>)}
                   </select>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-1" style={{ color: '#333' }}>
-                  Zona / Sector <span style={{ color: '#e53e3e' }}>*</span>
-                </label>
-                <input
-                  name="zona"
-                  value={form.zona}
-                  onChange={handleChange}
-                  required
-                  placeholder="Ej: Zona 10, Zona 14, Cayalá..."
-                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none"
-                  style={{ borderColor: '#CBD5E0' }}
-                />
-              </div>
+              {/* Ubicación geográfica */}
+              {form.pais === 'Guatemala' ? (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-1" style={{ color: '#333' }}>Departamento</label>
+                      <select
+                        value={form.departamento}
+                        onChange={e => setForm(prev => ({ ...prev, departamento: e.target.value, municipio: '', zona: '' }))}
+                        className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none"
+                        style={{ borderColor: '#CBD5E0' }}
+                      >
+                        <option value="">Seleccionar departamento</option>
+                        {DEPARTAMENTOS_GUATEMALA.map(d => <option key={d.nombre}>{d.nombre}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1" style={{ color: '#333' }}>Municipio</label>
+                      <select
+                        value={form.municipio}
+                        onChange={e => setForm(prev => ({ ...prev, municipio: e.target.value, zona: '' }))}
+                        disabled={!form.departamento}
+                        className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none"
+                        style={{ borderColor: '#CBD5E0', opacity: form.departamento ? 1 : 0.5 }}
+                      >
+                        <option value="">Seleccionar municipio</option>
+                        {(DEPARTAMENTOS_GUATEMALA.find(d => d.nombre === form.departamento)?.municipios ?? []).map(m => (
+                          <option key={m}>{m}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  {/* Zona: solo para Guatemala Ciudad */}
+                  {form.departamento === 'Guatemala' && form.municipio === 'Guatemala' && (
+                    <div>
+                      <label className="block text-sm font-medium mb-1" style={{ color: '#333' }}>Zona</label>
+                      <select
+                        value={form.zona}
+                        onChange={e => setForm(prev => ({ ...prev, zona: e.target.value }))}
+                        className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none"
+                        style={{ borderColor: '#CBD5E0' }}
+                      >
+                        <option value="">Seleccionar zona (opcional)</option>
+                        {ZONAS_CIUDAD_GUATEMALA.map(z => <option key={z}>{z}</option>)}
+                      </select>
+                    </div>
+                  )}
+                  {/* Sector libre para otros municipios */}
+                  {!(form.departamento === 'Guatemala' && form.municipio === 'Guatemala') && (
+                    <div>
+                      <label className="block text-sm font-medium mb-1" style={{ color: '#333' }}>Sector / Colonia (opcional)</label>
+                      <input
+                        name="zona"
+                        value={form.zona}
+                        onChange={handleChange}
+                        placeholder="Ej: Cayalá, Muxbal, Ciudad San Cristóbal..."
+                        className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none"
+                        style={{ borderColor: '#CBD5E0' }}
+                      />
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div>
+                  <label className="block text-sm font-medium mb-1" style={{ color: '#333' }}>
+                    Ciudad o región <span style={{ color: '#e53e3e' }}>*</span>
+                  </label>
+                  <input
+                    name="zona"
+                    value={form.zona}
+                    onChange={handleChange}
+                    required
+                    placeholder="Ej: San José, Zona Rosa, Santa Ana..."
+                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none"
+                    style={{ borderColor: '#CBD5E0' }}
+                  />
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium mb-1" style={{ color: '#333' }}>

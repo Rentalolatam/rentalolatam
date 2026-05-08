@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Link, useNavigate } from 'react-router-dom'
+import Buscador from './components/Buscador'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import Navbar from './components/Navbar'
@@ -74,24 +75,8 @@ function LandingPage() {
         <p style={{ color: '#CBD5E0', fontSize: '18px', marginBottom: '40px' }}>
           La plataforma de rentas más completa de la región. Propiedades verificadas, contratos digitales y pagos seguros.
         </p>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', flexWrap: 'wrap' }}>
-          <input
-            placeholder="Zona, colonia o ciudad..."
-            style={{ padding: '14px 20px', borderRadius: '8px', border: 'none', width: '320px', fontSize: '15px' }}
-          />
-          <select style={{ padding: '14px 20px', borderRadius: '8px', border: 'none', fontSize: '15px', color: '#666' }}>
-            <option>Guatemala</option>
-            <option>El Salvador</option>
-            <option>Honduras</option>
-            <option>Costa Rica</option>
-            <option>Panamá</option>
-          </select>
-          <button
-            style={{ backgroundColor: '#52B788', color: 'white', padding: '14px 32px', borderRadius: '8px', border: 'none', fontSize: '15px', fontWeight: 'bold', cursor: 'pointer' }}
-            onClick={() => window.location.href = '/propiedades'}
-          >
-            Buscar
-          </button>
+        <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
+          <Buscador dark={true} />
         </div>
       </div>
 
