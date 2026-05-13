@@ -37,4 +37,8 @@ export const PAISES = [
   "Honduras",
   "Nicaragua",
   "Panamá",
+  "Ecuador",
+  "Colombia",
+  "Perú",
+  "República Dominicana",
 ]

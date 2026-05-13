@@ -7,21 +7,42 @@ import { DEPARTAMENTOS_GUATEMALA, ZONAS_CIUDAD_GUATEMALA, PAISES } from '../data
 import MapaPinEditor from '../components/MapaPinEditor'
 
 const TIPO_CAMBIO_POR_PAIS: Record<string, number> = {
-  'Guatemala':   7.75,
-  'Costa Rica':  510,
-  'El Salvador': 1.00,
-  'Honduras':    24.50,
-  'Nicaragua':   36.50,
-  'Panamá':      1.00,
+  'Guatemala':            7.75,
+  'Costa Rica':           510,
+  'El Salvador':          1.00,
+  'Honduras':             24.50,
+  'Nicaragua':            36.50,
+  'Panamá':               1.00,
+  'Ecuador':              1.00,
+  'Colombia':             4000,
+  'Perú':                 3.75,
+  'República Dominicana': 58,
 }
 
 const MONEDA_POR_PAIS: Record<string, { simbolo: string; codigo: string }> = {
-  'Guatemala':   { simbolo: 'Q',   codigo: 'GTQ' },
-  'Costa Rica':  { simbolo: '₡',   codigo: 'CRC' },
-  'El Salvador': { simbolo: '$',   codigo: 'USD' },
-  'Honduras':    { simbolo: 'L',   codigo: 'HNL' },
-  'Nicaragua':   { simbolo: 'C$',  codigo: 'NIO' },
-  'Panamá':      { simbolo: 'B/.', codigo: 'PAB' },
+  'Guatemala':            { simbolo: 'Q',   codigo: 'GTQ' },
+  'Costa Rica':           { simbolo: '₡',   codigo: 'CRC' },
+  'El Salvador':          { simbolo: '$',   codigo: 'USD' },
+  'Honduras':             { simbolo: 'L',   codigo: 'HNL' },
+  'Nicaragua':            { simbolo: 'C$',  codigo: 'NIO' },
+  'Panamá':               { simbolo: 'B/.', codigo: 'PAB' },
+  'Ecuador':              { simbolo: '$',   codigo: 'USD' },
+  'Colombia':             { simbolo: '$',   codigo: 'COP' },
+  'Perú':                 { simbolo: 'S/',  codigo: 'PEN' },
+  'República Dominicana': { simbolo: 'RD$', codigo: 'DOP' },
+}
+
+const CENTROS_PAISES: Record<string, { lat: number; lng: number }> = {
+  'Guatemala':            { lat: 14.6349,  lng: -90.5069 },
+  'Costa Rica':           { lat:  9.9281,  lng: -84.0907 },
+  'El Salvador':          { lat: 13.6929,  lng: -89.2182 },
+  'Honduras':             { lat: 14.0723,  lng: -87.2068 },
+  'Nicaragua':            { lat: 12.1328,  lng: -86.2504 },
+  'Panamá':               { lat:  8.9936,  lng: -79.5197 },
+  'Ecuador':              { lat: -0.1807,  lng: -78.4678 },
+  'Colombia':             { lat:  4.7110,  lng: -74.0721 },
+  'Perú':                 { lat: -12.0464, lng: -77.0428 },
+  'República Dominicana': { lat: 18.4861,  lng: -69.9312 },
 }
 
 const MIN_FOTOS = 3
@@ -472,8 +493,7 @@ export default function NuevaPropiedad() {
                     Mueve el pin a la ubicación aproximada de tu propiedad.
                   </p>
                   <MapaPinEditor
-                    initialLat={coordPin?.lat}
-                    initialLng={coordPin?.lng}
+                    center={CENTROS_PAISES[form.pais] ?? CENTROS_PAISES['Guatemala']}
                     onCoordChange={(lat, lng) => setCoordPin({ lat, lng })}
                   />
                   {coordPin && (
