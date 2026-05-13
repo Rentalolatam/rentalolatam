@@ -149,6 +149,14 @@ export default function NuevaPropiedad() {
     e.preventDefault()
     setError(null)
 
+    if (!form.pais) {
+      setError('El campo País es obligatorio.')
+      return
+    }
+    if (form.pais === 'Guatemala' && !form.departamento) {
+      setError('El campo Departamento es obligatorio.')
+      return
+    }
     if (fotos.length < MIN_FOTOS) {
       setError(`Debés seleccionar al menos ${MIN_FOTOS} fotos del apartamento.`)
       return
@@ -309,7 +317,7 @@ export default function NuevaPropiedad() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1" style={{ color: '#333' }}>País</label>
+                  <label className="block text-sm font-medium mb-1" style={{ color: '#333' }}>País <span style={{ color: 'red' }}>*</span></label>
                   <select
                     name="pais"
                     value={form.pais}
@@ -331,7 +339,7 @@ export default function NuevaPropiedad() {
                 <>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium mb-1" style={{ color: '#333' }}>Departamento</label>
+                      <label className="block text-sm font-medium mb-1" style={{ color: '#333' }}>Departamento <span style={{ color: 'red' }}>*</span></label>
                       <select
                         value={form.departamento}
                         onChange={e => setForm(prev => ({ ...prev, departamento: e.target.value, municipio: '', zona: '' }))}
