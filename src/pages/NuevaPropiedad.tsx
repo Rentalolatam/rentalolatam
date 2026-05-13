@@ -5,7 +5,15 @@ import Navbar from '../components/Navbar'
 import { useAuth } from '../context/AuthContext'
 import { DEPARTAMENTOS_GUATEMALA, ZONAS_CIUDAD_GUATEMALA, PAISES } from '../data/geografia'
 
-const TIPO_CAMBIO = 7.75
+const TIPO_CAMBIO_POR_PAIS: Record<string, number> = {
+  'Guatemala':   7.75,
+  'Costa Rica':  510,
+  'El Salvador': 1.00,
+  'Honduras':    24.50,
+  'Nicaragua':   36.50,
+  'Panamá':      1.00,
+}
+
 const MIN_FOTOS = 3
 const MAX_FOTOS = 10
 const MAX_FOTOS_EDIFICIO = 10
@@ -83,9 +91,10 @@ export default function NuevaPropiedad() {
   const [enviando, setEnviando]             = useState(false)
   const [progreso, setProgreso]             = useState<{ actual: number; total: number } | null>(null)
   const [error, setError]                   = useState<string | null>(null)
+  const [tipoCambio, setTipoCambio]         = useState<number>(7.75)
 
-  const precioDolares = form.precio_quetzales
-    ? (parseFloat(form.precio_quetzales) / TIPO_CAMBIO).toFixed(2)
+  const precioDolares = form.precio_quetzales && tipoCambio > 0
+    ? (parseFloat(form.precio_quetzales) / tipoCambio).toFixed(2)
     : ''
 
   const mostrarInfoEdificio = form.tipo === 'Apartamento' || (form.tipo === 'Casa' && enCondominio)
@@ -304,7 +313,11 @@ export default function NuevaPropiedad() {
                   <select
                     name="pais"
                     value={form.pais}
-                    onChange={e => setForm(prev => ({ ...prev, pais: e.target.value, departamento: '', municipio: '', zona: '' }))}
+                    onChange={e => {
+                      const p = e.target.value
+                      setForm(prev => ({ ...prev, pais: p, departamento: '', municipio: '', zona: '' }))
+                      setTipoCambio(TIPO_CAMBIO_POR_PAIS[p] ?? 7.75)
+                    }}
                     className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none"
                     style={{ borderColor: '#CBD5E0' }}
                   >
@@ -433,10 +446,10 @@ export default function NuevaPropiedad() {
             <h2 className="text-lg font-semibold mb-4" style={{ color: '#1B3A5C' }}>Precio</h2>
             <div className="space-y-4">
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1" style={{ color: '#333' }}>
-                    Precio en quetzales (Q) <span style={{ color: '#e53e3e' }}>*</span>
+                    Precio (moneda local) <span style={{ color: '#e53e3e' }}>*</span>
                   </label>
                   <input
                     name="precio_quetzales"
@@ -454,6 +467,22 @@ export default function NuevaPropiedad() {
 
                 <div>
                   <label className="block text-sm font-medium mb-1" style={{ color: '#333' }}>
+                    Tipo de cambio (1 USD = ?)
+                  </label>
+                  <input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={tipoCambio}
+                    onChange={e => setTipoCambio(parseFloat(e.target.value) || 0)}
+                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none"
+                    style={{ borderColor: '#CBD5E0' }}
+                  />
+                  <p className="text-xs mt-1" style={{ color: '#999' }}>Tasa oficial sugerida. Ajustá según tu negociación.</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1" style={{ color: '#333' }}>
                     Precio en dólares (USD)
                   </label>
                   <input
@@ -464,7 +493,6 @@ export default function NuevaPropiedad() {
                     className="w-full border rounded-lg px-3 py-2 text-sm"
                     style={{ borderColor: '#CBD5E0', backgroundColor: '#F8F9FA', color: '#666' }}
                   />
-                  <p className="text-xs mt-1" style={{ color: '#999' }}>Tipo de cambio: Q7.75 = $1</p>
                 </div>
               </div>
 
