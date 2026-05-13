@@ -57,6 +57,7 @@ type FormData = {
   metraje_con_parqueo: string
   descripcion: string
   estado: string
+  mostrar_mapa: boolean
 }
 
 type FotoLocal = {
@@ -83,6 +84,7 @@ const initialForm: FormData = {
   metraje_con_parqueo: '',
   descripcion: '',
   estado: 'disponible',
+  mostrar_mapa: false,
 }
 
 export default function NuevaPropiedad() {
@@ -254,6 +256,7 @@ export default function NuevaPropiedad() {
       descripcion: form.descripcion || null,
       fotos: fotosUrls,
       estado: form.estado,
+      mostrar_mapa: form.mostrar_mapa,
       publicado_por: usuario?.id ?? null,
       tiene_info_edificio: mostrarInfoEdificio,
       amenidades_edificio: amenidadesFinales,
@@ -439,6 +442,24 @@ export default function NuevaPropiedad() {
                   <option value="en mantenimiento">En mantenimiento</option>
                 </select>
               </div>
+
+              {/* Toggle mapa */}
+              <label className="flex items-start gap-3 cursor-pointer p-4 rounded-lg" style={{ backgroundColor: '#F0FFF4', border: '1px solid #9AE6B4' }}>
+                <input
+                  type="checkbox"
+                  name="mostrar_mapa"
+                  checked={form.mostrar_mapa}
+                  onChange={handleChange}
+                  className="mt-0.5 w-4 h-4 rounded"
+                  style={{ accentColor: '#52B788' }}
+                />
+                <div>
+                  <span className="text-sm font-semibold" style={{ color: '#2D6A4F' }}>Mostrar ubicación en el mapa</span>
+                  <p className="text-xs mt-1" style={{ color: '#555' }}>
+                    Las propiedades con mapa se alquilan un 30% más rápido y generan más confianza en los inquilinos.
+                  </p>
+                </div>
+              </label>
 
               {/* Checkbox condominio — solo para Casa */}
               {form.tipo === 'Casa' && (

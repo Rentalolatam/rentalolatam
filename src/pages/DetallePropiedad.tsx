@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, type Propiedad, type SolicitudArriendo } from '../lib/supabase'
 import Navbar from '../components/Navbar'
 import { useAuth } from '../context/AuthContext'
+import MapaUbicacion from '../components/MapaUbicacion'
 
 const ESTADO_BADGE: Record<string, { label: string; bg: string; color: string }> = {
   disponible: { label: 'Disponible', bg: '#F0FFF4', color: '#2D6A4F' },
@@ -229,6 +230,25 @@ export default function DetallePropiedad() {
             </div>
           )}
         </div>
+
+        {/* MAPA DE UBICACIÓN APROXIMADA */}
+        {p.mostrar_mapa && (
+          <div style={{ marginBottom: '32px', backgroundColor: 'white', borderRadius: '16px', padding: '24px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>
+            <h2 style={{ color: '#1B3A5C', fontSize: '18px', fontWeight: 'bold', margin: '0 0 4px' }}>📍 Ubicación</h2>
+            <p style={{ color: '#666', fontSize: '13px', margin: '0 0 16px' }}>
+              {[p.zona, p.municipio, p.departamento, p.pais].filter(Boolean).join(', ')}
+            </p>
+            <MapaUbicacion
+              zona={p.zona}
+              municipio={p.municipio}
+              departamento={p.departamento}
+              pais={p.pais}
+            />
+            <p style={{ color: '#999', fontSize: '12px', marginTop: '10px', textAlign: 'center' }}>
+              Ubicación aproximada. La dirección exacta se comparte al confirmar el arriendo.
+            </p>
+          </div>
+        )}
 
         {/* CONTENIDO: info + panel lateral */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '32px', alignItems: 'start' }}>
