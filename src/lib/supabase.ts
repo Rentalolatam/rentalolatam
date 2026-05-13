@@ -32,6 +32,8 @@ export type Propiedad = {
   departamento: string | null
   municipio: string | null
   mostrar_mapa: boolean | null
+  latitud: number | null
+  longitud: number | null
   publicado_por: string | null
   created_at: string
 }
