@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { supabase, type SolicitudArriendo, type DocumentoInquilino, type TipoDocumento, type Contrato } from '../lib/supabase'
+import { supabase, type SolicitudArriendo, type DocumentoInquilino, type TipoDocumento, type Contrato, type DocumentoPerfil } from '../lib/supabase'
 import Navbar from '../components/Navbar'
 import { useAuth } from '../context/AuthContext'
 
@@ -53,10 +53,11 @@ export default function DetalleInquilino() {
   const navigate = useNavigate()
   const { usuario } = useAuth()
 
-  const [solicitud, setSolicitud]    = useState<SolicitudConPropiedad | null>(null)
-  const [documentos, setDocumentos]  = useState<DocumentoInquilino[]>([])
-  const [cargando, setCargando]      = useState(true)
-  const [error, setError]            = useState<string | null>(null)
+  const [solicitud, setSolicitud]        = useState<SolicitudConPropiedad | null>(null)
+  const [documentos, setDocumentos]      = useState<DocumentoInquilino[]>([])
+  const [docsPerfilTenant, setDocsPerfilTenant] = useState<DocumentoPerfil[]>([])
+  const [cargando, setCargando]          = useState(true)
+  const [error, setError]                = useState<string | null>(null)
 
   const [subiendo, setSubiendo]      = useState<TipoDocumento | null>(null)
   const [errorDoc, setErrorDoc]      = useState<string | null>(null)
@@ -89,8 +90,17 @@ export default function DetalleInquilino() {
       ])
       if (solErr) setError(solErr.message)
       else {
-        setSolicitud(solData as SolicitudConPropiedad)
+        const sol = solData as SolicitudConPropiedad
+        setSolicitud(sol)
         setDocumentos((docData as DocumentoInquilino[]) ?? [])
+        // Load tenant's profile documents
+        if (sol.inquilino_id) {
+          const { data: pDocs } = await supabase
+            .from('documentos_perfil')
+            .select('*')
+            .eq('user_id', sol.inquilino_id)
+          setDocsPerfilTenant((pDocs as DocumentoPerfil[]) ?? [])
+        }
       }
       setCargando(false)
     }
@@ -285,6 +295,13 @@ export default function DetalleInquilino() {
               <span style={{ color: '#276749', fontSize: '13px', fontWeight: 'bold' }}>🏡 Arriendo activo</span>
             </div>
           )}
+
+          <button
+            onClick={() => navigate(`/conversacion/${id}`)}
+            style={{ backgroundColor: 'white', color: '#1B3A5C', border: '1.5px solid #1B3A5C', borderRadius: '8px', padding: '8px 18px', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer', flexShrink: 0 }}
+          >
+            💬 Ver conversación
+          </button>
         </div>
 
         {/* Info de la solicitud */}
@@ -422,6 +439,45 @@ export default function DetalleInquilino() {
                   </>
                 )
               })()}
+            </div>
+          </div>
+        )}
+
+        {/* ── DOCUMENTOS DE PERFIL DEL INQUILINO (read-only) ── */}
+        {docsPerfilTenant.length > 0 && (
+          <div style={{ backgroundColor: 'white', borderRadius: '12px', padding: '24px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)' }}>
+            <h2 style={{ color: '#1B3A5C', fontSize: '15px', fontWeight: 'bold', margin: '0 0 16px' }}>📋 Documentos de perfil del inquilino</h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {docsPerfilTenant.map((doc) => {
+                const labels: Record<string, string> = {
+                  dpi: 'DPI / Pasaporte',
+                  comprobante_ingresos: 'Comprobante de ingresos',
+                  carta_trabajo: 'Carta de trabajo',
+                  referencias: 'Cartas de referencia',
+                }
+                return (
+                  <div
+                    key={doc.id}
+                    style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '12px 16px', borderRadius: '10px', backgroundColor: '#F0FFF4', border: '1.5px solid #9AE6B4' }}
+                  >
+                    <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#C6F6D5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', flexShrink: 0 }}>
+                      ✅
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <span style={{ fontSize: '14px', fontWeight: '600', color: '#1B3A5C' }}>{labels[doc.tipo] ?? doc.tipo}</span>
+                      {doc.nombre_archivo && <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>{doc.nombre_archivo}</div>}
+                    </div>
+                    <a
+                      href={doc.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ fontSize: '12px', color: '#2D6A4F', textDecoration: 'none', padding: '5px 12px', border: '1px solid #9AE6B4', borderRadius: '6px', backgroundColor: 'white' }}
+                    >
+                      Ver
+                    </a>
+                  </div>
+                )
+              })}
             </div>
           </div>
         )}

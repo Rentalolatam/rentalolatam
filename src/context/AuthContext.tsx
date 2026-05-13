@@ -6,7 +6,6 @@ export type PerfilUsuario = {
   id: string
   email: string
   nombre: string
-  tipo: 'Propietario' | 'Inquilino'
   foto: string | null
 }
 
@@ -15,7 +14,7 @@ type AuthContextType = {
   cargando: boolean
   login: (email: string, password: string) => Promise<string | null>
   logout: () => Promise<void>
-  registro: (nombre: string, email: string, password: string, tipo: string) => Promise<string | null>
+  registro: (nombre: string, email: string, password: string) => Promise<string | null>
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
@@ -28,7 +27,6 @@ function mapUser(user: User): PerfilUsuario {
       ?? (user.user_metadata?.full_name as string | undefined)
       ?? user.email
       ?? '',
-    tipo: (user.user_metadata?.tipo as 'Propietario' | 'Inquilino' | undefined) ?? 'Inquilino',
     foto: (user.user_metadata?.avatar_url as string | undefined)
       ?? (user.user_metadata?.picture as string | undefined)
       ?? null,
@@ -66,12 +64,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     nombre: string,
     email: string,
     password: string,
-    tipo: string,
   ): Promise<string | null> => {
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { nombre, tipo } },
+      options: { data: { nombre } },
     })
     if (error) return error.message
     return null

@@ -28,7 +28,6 @@ export default function Registro() {
   const [nombre, setNombre] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [tipo, setTipo] = useState<'Propietario' | 'Inquilino'>('Inquilino')
   const [error, setError] = useState<string | null>(null)
   const [exito, setExito] = useState(false)
   const [cargando, setCargando] = useState(false)
@@ -49,7 +48,7 @@ export default function Registro() {
     }
 
     setCargando(true)
-    const err = await registro(nombre.trim(), email, password, tipo)
+    const err = await registro(nombre.trim(), email, password)
     setCargando(false)
 
     if (err) {
@@ -217,35 +216,6 @@ export default function Registro() {
                 placeholder="Mínimo 6 caracteres"
                 style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1.5px solid #CBD5E0', fontSize: '14px', boxSizing: 'border-box', outline: 'none' }}
               />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#333', marginBottom: '10px' }}>
-                ¿Cómo vas a usar RentaloLatam?
-              </label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                {(['Inquilino', 'Propietario'] as const).map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    disabled={bloqueado}
-                    onClick={() => setTipo(t)}
-                    style={{
-                      padding: '14px 12px', borderRadius: '10px',
-                      border: `2px solid ${tipo === t ? '#52B788' : '#E2E8F0'}`,
-                      backgroundColor: tipo === t ? '#F0FFF4' : 'white',
-                      cursor: bloqueado ? 'not-allowed' : 'pointer',
-                      textAlign: 'center', transition: 'all 0.15s',
-                    }}
-                  >
-                    <div style={{ fontSize: '22px', marginBottom: '4px' }}>{t === 'Inquilino' ? '🔍' : '🏠'}</div>
-                    <div style={{ fontSize: '13px', fontWeight: 'bold', color: tipo === t ? '#2D6A4F' : '#333' }}>{t}</div>
-                    <div style={{ fontSize: '11px', color: '#666', marginTop: '2px' }}>
-                      {t === 'Inquilino' ? 'Busco propiedad' : 'Tengo propiedades'}
-                    </div>
-                  </button>
-                ))}
-              </div>
             </div>
 
             {error && (
