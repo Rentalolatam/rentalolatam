@@ -31,6 +31,7 @@ export type Propiedad = {
   tiene_info_edificio: boolean | null
   departamento: string | null
   municipio: string | null
+  mostrar_mapa: boolean | null
   publicado_por: string | null
   created_at: string
 }
