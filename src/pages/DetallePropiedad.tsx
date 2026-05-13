@@ -232,18 +232,10 @@ export default function DetallePropiedad() {
         </div>
 
         {/* MAPA DE UBICACIÓN APROXIMADA */}
-        {p.mostrar_mapa && (
+        {p.mostrar_mapa && p.latitud != null && p.longitud != null && (
           <div style={{ marginBottom: '32px', backgroundColor: 'white', borderRadius: '16px', padding: '24px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>
-            <h2 style={{ color: '#1B3A5C', fontSize: '18px', fontWeight: 'bold', margin: '0 0 4px' }}>📍 Ubicación</h2>
-            <p style={{ color: '#666', fontSize: '13px', margin: '0 0 16px' }}>
-              {[p.zona, p.municipio, p.departamento, p.pais].filter(Boolean).join(', ')}
-            </p>
-            <MapaUbicacion
-              zona={p.zona}
-              municipio={p.municipio}
-              departamento={p.departamento}
-              pais={p.pais}
-            />
+            <h2 style={{ color: '#1B3A5C', fontSize: '18px', fontWeight: 'bold', margin: '0 0 16px' }}>📍 Ubicación</h2>
+            <MapaUbicacion lat={p.latitud} lng={p.longitud} />
             <p style={{ color: '#999', fontSize: '12px', marginTop: '10px', textAlign: 'center' }}>
               Ubicación aproximada. La dirección exacta se comparte al confirmar el arriendo.
             </p>

@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import Navbar from '../components/Navbar'
 import { useAuth } from '../context/AuthContext'
 import { DEPARTAMENTOS_GUATEMALA, ZONAS_CIUDAD_GUATEMALA, PAISES } from '../data/geografia'
+import MapaPinEditor from '../components/MapaPinEditor'
 
 const TIPO_CAMBIO_POR_PAIS: Record<string, number> = {
   'Guatemala':   7.75,
@@ -103,6 +104,7 @@ export default function NuevaPropiedad() {
   const [progreso, setProgreso]             = useState<{ actual: number; total: number } | null>(null)
   const [error, setError]                   = useState<string | null>(null)
   const [tipoCambio, setTipoCambio]         = useState<number>(7.75)
+  const [coordPin, setCoordPin]             = useState<{ lat: number; lng: number } | null>(null)
 
   const precioDolares = form.precio_quetzales && tipoCambio > 0
     ? (parseFloat(form.precio_quetzales) / tipoCambio).toFixed(2)
@@ -257,6 +259,8 @@ export default function NuevaPropiedad() {
       fotos: fotosUrls,
       estado: form.estado,
       mostrar_mapa: form.mostrar_mapa,
+      latitud: coordPin?.lat ?? null,
+      longitud: coordPin?.lng ?? null,
       publicado_por: usuario?.id ?? null,
       tiene_info_edificio: mostrarInfoEdificio,
       amenidades_edificio: amenidadesFinales,
@@ -460,6 +464,25 @@ export default function NuevaPropiedad() {
                   </p>
                 </div>
               </label>
+
+              {/* Editor de pin — visible cuando el toggle está activo */}
+              {form.mostrar_mapa && (
+                <div>
+                  <p className="text-sm mb-2" style={{ color: '#555' }}>
+                    Mueve el pin a la ubicación aproximada de tu propiedad.
+                  </p>
+                  <MapaPinEditor
+                    initialLat={coordPin?.lat}
+                    initialLng={coordPin?.lng}
+                    onCoordChange={(lat, lng) => setCoordPin({ lat, lng })}
+                  />
+                  {coordPin && (
+                    <p className="text-xs mt-2" style={{ color: '#52B788' }}>
+                      Pin ubicado en {coordPin.lat.toFixed(5)}, {coordPin.lng.toFixed(5)}
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* Checkbox condominio — solo para Casa */}
               {form.tipo === 'Casa' && (
