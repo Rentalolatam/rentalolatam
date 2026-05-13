@@ -14,6 +14,15 @@ const TIPO_CAMBIO_POR_PAIS: Record<string, number> = {
   'Panamá':      1.00,
 }
 
+const MONEDA_POR_PAIS: Record<string, { simbolo: string; codigo: string }> = {
+  'Guatemala':   { simbolo: 'Q',   codigo: 'GTQ' },
+  'Costa Rica':  { simbolo: '₡',   codigo: 'CRC' },
+  'El Salvador': { simbolo: '$',   codigo: 'USD' },
+  'Honduras':    { simbolo: 'L',   codigo: 'HNL' },
+  'Nicaragua':   { simbolo: 'C$',  codigo: 'NIO' },
+  'Panamá':      { simbolo: 'B/.', codigo: 'PAB' },
+}
+
 const MIN_FOTOS = 3
 const MAX_FOTOS = 10
 const MAX_FOTOS_EDIFICIO = 10
@@ -149,6 +158,14 @@ export default function NuevaPropiedad() {
     e.preventDefault()
     setError(null)
 
+    if (!form.pais) {
+      setError('El campo País es obligatorio.')
+      return
+    }
+    if (form.pais === 'Guatemala' && !form.departamento) {
+      setError('El campo Departamento es obligatorio.')
+      return
+    }
     if (fotos.length < MIN_FOTOS) {
       setError(`Debés seleccionar al menos ${MIN_FOTOS} fotos del apartamento.`)
       return
@@ -309,7 +326,7 @@ export default function NuevaPropiedad() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1" style={{ color: '#333' }}>País</label>
+                  <label className="block text-sm font-medium mb-1" style={{ color: '#333' }}>País <span style={{ color: '#e53e3e' }}>*</span></label>
                   <select
                     name="pais"
                     value={form.pais}
@@ -331,7 +348,7 @@ export default function NuevaPropiedad() {
                 <>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium mb-1" style={{ color: '#333' }}>Departamento</label>
+                      <label className="block text-sm font-medium mb-1" style={{ color: '#333' }}>Departamento <span style={{ color: '#e53e3e' }}>*</span></label>
                       <select
                         value={form.departamento}
                         onChange={e => setForm(prev => ({ ...prev, departamento: e.target.value, municipio: '', zona: '' }))}
@@ -478,7 +495,11 @@ export default function NuevaPropiedad() {
                     className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none"
                     style={{ borderColor: '#CBD5E0' }}
                   />
-                  <p className="text-xs mt-1" style={{ color: '#999' }}>Tasa oficial sugerida. Ajustá según tu negociación.</p>
+                  <p className="text-xs mt-1" style={{ color: '#999' }}>
+                    {MONEDA_POR_PAIS[form.pais]
+                      ? `Tasa oficial sugerida: 1 USD = ${MONEDA_POR_PAIS[form.pais].simbolo}${tipoCambio} (${MONEDA_POR_PAIS[form.pais].codigo}). Ajustá según tu negociación.`
+                      : 'Tasa oficial sugerida para la moneda local. Ajustá según tu negociación.'}
+                  </p>
                 </div>
 
                 <div>
