@@ -16,6 +16,7 @@ import EditarPropiedad from './pages/EditarPropiedad'
 import Login from './pages/Login'
 import Registro from './pages/Registro'
 import AuthCallback from './pages/AuthCallback'
+import Nosotros from './pages/Nosotros'
 
 function LandingPage() {
   const { usuario, logout } = useAuth()
@@ -36,6 +37,7 @@ function LandingPage() {
         </Link>
         <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
           <Link to="/propiedades" style={{ color: 'white', textDecoration: 'none', fontSize: '14px' }}>Propiedades</Link>
+          <Link to="/nosotros" style={{ color: 'white', textDecoration: 'none', fontSize: '14px' }}>Nosotros</Link>
           <a href="#propietarios" style={{ color: 'white', textDecoration: 'none', fontSize: '14px' }}>Para propietarios</a>
           <a href="#footer" style={{ color: 'white', textDecoration: 'none', fontSize: '14px' }}>Contacto</a>
 
@@ -178,6 +180,7 @@ function App() {
           <Route path="/mi-arriendo" element={<ProtectedRoute><MiArriendo /></ProtectedRoute>} />
           <Route path="/contratos" element={<ProtectedRoute><Contratos /></ProtectedRoute>} />
           <Route path="/dashboard" element={<ProtectedRoute><MisDashboard /></ProtectedRoute>} />
+          <Route path="/nosotros" element={<Nosotros />} />
           <Route path="/propiedades/:id/editar" element={<ProtectedRoute><EditarPropiedad /></ProtectedRoute>} />
           <Route
             path="/propiedades/nueva"

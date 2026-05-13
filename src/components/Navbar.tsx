@@ -76,6 +76,10 @@ export default function Navbar({ extraLinks }: NavbarProps) {
           Propiedades
         </Link>
 
+        <Link to="/nosotros" style={{ color: 'white', textDecoration: 'none', fontSize: '14px' }}>
+          Nosotros
+        </Link>
+
         {tienePropiedades && (
           <Link to="/dashboard" style={{ color: 'white', textDecoration: 'none', fontSize: '14px' }}>
             Mi dashboard
