@@ -96,3 +96,47 @@ export type SolicitudArriendo = {
   created_at: string
   updated_at: string
 }
+
+export type Perfil = {
+  id: string
+  nombre_completo: string | null
+  tipo_documento: 'DPI' | 'Pasaporte' | null
+  numero_documento: string | null
+  telefono: string | null
+  pais: string | null
+  edad: number | null
+  sexo: 'Masculino' | 'Femenino' | 'Prefiero no decir' | null
+  foto_url: string | null
+  perfil_completo: boolean
+  created_at: string
+  updated_at: string
+}
+
+export type TipoDocumentoPerfil = 'dpi' | 'comprobante_ingresos' | 'carta_trabajo' | 'referencias'
+
+export type DocumentoPerfil = {
+  id: string
+  user_id: string
+  tipo: TipoDocumentoPerfil
+  url: string
+  nombre_archivo: string | null
+  created_at: string
+}
+
+export type Conversacion = {
+  id: string
+  propiedad_id: string | null
+  propietario_id: string
+  inquilino_id: string
+  solicitud_id: string | null
+  created_at: string
+}
+
+export type Mensaje = {
+  id: string
+  conversacion_id: string
+  sender_id: string
+  sender_nombre: string
+  contenido: string
+  created_at: string
+}

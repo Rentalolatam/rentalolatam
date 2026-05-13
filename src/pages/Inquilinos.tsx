@@ -122,6 +122,7 @@ export default function Inquilinos() {
                   accionando={accionando}
                   onAprobar={() => cambiarEstado(sol.id, 'aprobada')}
                   onRechazar={() => cambiarEstado(sol.id, 'rechazada')}
+                  onChat={() => navigate(`/conversacion/${sol.id}`)}
                 />
               ))}
             </div>
@@ -140,6 +141,7 @@ export default function Inquilinos() {
                   key={sol.id}
                   solicitud={sol}
                   onClick={() => navigate(`/inquilinos/${sol.id}`)}
+                  onChat={() => navigate(`/conversacion/${sol.id}`)}
                 />
               ))}
             </div>
@@ -169,11 +171,13 @@ function SolicitudPendienteCard({
   accionando,
   onAprobar,
   onRechazar,
+  onChat,
 }: {
   solicitud: SolicitudConPropiedad
   accionando: string | null
   onAprobar: () => void
   onRechazar: () => void
+  onChat: () => void
 }) {
   const ocupado = accionando === sol.id
   const iniciales = (sol.inquilino_nombre ?? 'IN')
@@ -218,7 +222,17 @@ function SolicitudPendienteCard({
       </div>
 
       {/* Botones */}
-      <div style={{ display: 'flex', gap: '8px', flexShrink: 0, alignSelf: 'center' }}>
+      <div style={{ display: 'flex', gap: '8px', flexShrink: 0, alignSelf: 'center', flexWrap: 'wrap' }}>
+        <button
+          onClick={onChat}
+          style={{
+            padding: '8px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 'bold',
+            border: '1.5px solid #CBD5E0', backgroundColor: 'white',
+            color: '#1B3A5C', cursor: 'pointer',
+          }}
+        >
+          💬 Chat
+        </button>
         <button
           onClick={onRechazar}
           disabled={ocupado}
@@ -249,9 +263,11 @@ function SolicitudPendienteCard({
 function InquilinoActivoCard({
   solicitud: sol,
   onClick,
+  onChat,
 }: {
   solicitud: SolicitudConPropiedad
   onClick: () => void
+  onChat: () => void
 }) {
   const cfg = ESTADO_ACTIVO_CFG[sol.estado] ?? ESTADO_ACTIVO_CFG['activa']
   const iniciales = (sol.inquilino_nombre ?? 'IN')
@@ -290,6 +306,12 @@ function InquilinoActivoCard({
         <p style={{ color: '#999', fontSize: '12px', margin: '4px 0 0' }}>
           {sol.propiedades?.zona ?? ''}
         </p>
+        <button
+          onClick={(e) => { e.stopPropagation(); onChat() }}
+          style={{ marginTop: '10px', fontSize: '12px', fontWeight: 'bold', padding: '5px 12px', borderRadius: '6px', border: '1.5px solid #CBD5E0', backgroundColor: 'white', color: '#1B3A5C', cursor: 'pointer' }}
+        >
+          💬 Ver conversación
+        </button>
       </div>
     </div>
   )

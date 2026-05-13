@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import Navbar from '../components/Navbar'
@@ -114,6 +114,14 @@ export default function NuevaPropiedad() {
   const { usuario } = useAuth()
   const inputFileRef    = useRef<HTMLInputElement>(null)
   const inputEdificioRef = useRef<HTMLInputElement>(null)
+
+  // Profile completion gate
+  useEffect(() => {
+    if (!usuario) return
+    supabase.from('profiles').select('perfil_completo').eq('id', usuario.id).maybeSingle().then(({ data }) => {
+      if (!data?.perfil_completo) navigate('/perfil?next=/propiedades/nueva')
+    })
+  }, [usuario]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const [form, setForm]                     = useState<FormData>(initialForm)
   const [fotos, setFotos]                   = useState<FotoLocal[]>([])

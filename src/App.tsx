@@ -17,6 +17,8 @@ import Login from './pages/Login'
 import Registro from './pages/Registro'
 import AuthCallback from './pages/AuthCallback'
 import Nosotros from './pages/Nosotros'
+import PerfilPage from './pages/Perfil'
+import ConversacionPage from './pages/Conversacion'
 
 function LandingPage() {
   const { usuario, logout } = useAuth()
@@ -44,13 +46,6 @@ function LandingPage() {
           {usuario ? (
             <>
               <span style={{ color: 'white', fontSize: '14px' }}>{usuario.nombre}</span>
-              <span style={{
-                fontSize: '11px', fontWeight: 'bold', padding: '2px 8px', borderRadius: '999px',
-                backgroundColor: usuario.tipo === 'Propietario' ? '#EBF8FF' : '#F0FFF4',
-                color: usuario.tipo === 'Propietario' ? '#2B6CB0' : '#2D6A4F',
-              }}>
-                {usuario.tipo}
-              </span>
               <button
                 onClick={handleLogout}
                 style={{ backgroundColor: 'transparent', color: '#CBD5E0', border: '1px solid #CBD5E0', padding: '6px 16px', borderRadius: '6px', fontSize: '13px', cursor: 'pointer' }}
@@ -181,6 +176,8 @@ function App() {
           <Route path="/contratos" element={<ProtectedRoute><Contratos /></ProtectedRoute>} />
           <Route path="/dashboard" element={<ProtectedRoute><MisDashboard /></ProtectedRoute>} />
           <Route path="/nosotros" element={<Nosotros />} />
+          <Route path="/perfil" element={<ProtectedRoute><PerfilPage /></ProtectedRoute>} />
+          <Route path="/conversacion/:solicitudId" element={<ProtectedRoute><ConversacionPage /></ProtectedRoute>} />
           <Route path="/propiedades/:id/editar" element={<ProtectedRoute><EditarPropiedad /></ProtectedRoute>} />
           <Route
             path="/propiedades/nueva"

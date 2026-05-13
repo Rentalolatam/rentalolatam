@@ -3,11 +3,6 @@ import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 
-const TIPO_BADGE: Record<string, { bg: string; color: string }> = {
-  Propietario: { bg: '#EBF8FF', color: '#2B6CB0' },
-  Inquilino: { bg: '#F0FFF4', color: '#2D6A4F' },
-}
-
 type NavbarProps = {
   extraLinks?: { label: string; href: string }[]
 }
@@ -56,8 +51,6 @@ export default function Navbar({ extraLinks }: NavbarProps) {
     await logout()
     navigate('/')
   }
-
-  const badge = usuario ? TIPO_BADGE[usuario.tipo] ?? TIPO_BADGE['Inquilino'] : null
 
   return (
     <nav style={{
@@ -116,7 +109,10 @@ export default function Navbar({ extraLinks }: NavbarProps) {
 
         {usuario ? (
           <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Link
+              to="/perfil"
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none' }}
+            >
               {usuario.foto ? (
                 <img
                   src={usuario.foto}
@@ -124,23 +120,15 @@ export default function Navbar({ extraLinks }: NavbarProps) {
                   referrerPolicy="no-referrer"
                   style={{ width: '30px', height: '30px', borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(255,255,255,0.4)' }}
                 />
-              ) : null}
+              ) : (
+                <div style={{ width: '30px', height: '30px', borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px' }}>
+                  👤
+                </div>
+              )}
               <span style={{ color: 'white', fontSize: '14px', fontWeight: '500' }}>
                 {usuario.nombre}
               </span>
-              {badge && (
-                <span style={{
-                  fontSize: '11px',
-                  fontWeight: 'bold',
-                  padding: '2px 8px',
-                  borderRadius: '999px',
-                  backgroundColor: badge.bg,
-                  color: badge.color,
-                }}>
-                  {usuario.tipo}
-                </span>
-              )}
-            </div>
+            </Link>
             <button
               onClick={handleLogout}
               style={{

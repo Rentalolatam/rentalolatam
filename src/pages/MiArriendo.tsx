@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase, type SolicitudArriendo, type DocumentoInquilino, type TipoDocumento } from '../lib/supabase'
 import Navbar from '../components/Navbar'
 import { useAuth } from '../context/AuthContext'
@@ -46,6 +47,7 @@ const ESTADO_INFO: Record<SolicitudArriendo['estado'], { label: string; descripc
 
 export default function MiArriendo() {
   const { usuario } = useAuth()
+  const navigate    = useNavigate()
 
   const [solicitudes, setSolicitudes]  = useState<SolicitudConPropiedad[]>([])
   const [documentos, setDocumentos]    = useState<DocumentoInquilino[]>([])
@@ -239,12 +241,22 @@ export default function MiArriendo() {
           return (
             <>
               {/* Estado de la solicitud */}
-              <div style={{ backgroundColor: info.bg, border: `1.5px solid ${info.color}30`, borderRadius: '12px', padding: '20px 24px', display: 'flex', gap: '16px', alignItems: 'center' }}>
+              <div style={{ backgroundColor: info.bg, border: `1.5px solid ${info.color}30`, borderRadius: '12px', padding: '20px 24px', display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
                 <div style={{ fontSize: '32px', flexShrink: 0 }}>{info.icon}</div>
-                <div>
+                <div style={{ flex: 1 }}>
                   <div style={{ color: info.color, fontSize: '16px', fontWeight: 'bold', marginBottom: '4px' }}>{info.label}</div>
                   <div style={{ color: '#555', fontSize: '14px' }}>{info.descripcion}</div>
                 </div>
+                <button
+                  onClick={() => navigate(`/conversacion/${sol.id}`)}
+                  style={{
+                    backgroundColor: '#1B3A5C', color: 'white', border: 'none',
+                    borderRadius: '8px', padding: '9px 18px', fontSize: '13px',
+                    fontWeight: 'bold', cursor: 'pointer', flexShrink: 0,
+                  }}
+                >
+                  💬 Mensaje al propietario
+                </button>
               </div>
 
               {/* Info de la propiedad */}

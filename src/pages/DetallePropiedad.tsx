@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { supabase, type Propiedad, type SolicitudArriendo } from '../lib/supabase'
+import { supabase, type Propiedad, type SolicitudArriendo, type Perfil } from '../lib/supabase'
 import Navbar from '../components/Navbar'
 import { useAuth } from '../context/AuthContext'
 import MapaUbicacion from '../components/MapaUbicacion'
@@ -26,6 +26,7 @@ export default function DetallePropiedad() {
   const [mensajeSolicitud, setMensajeSolicitud] = useState('')
   const [enviandoSolicitud, setEnviandoSolicitud] = useState(false)
   const [errorSolicitud, setErrorSolicitud] = useState<string | null>(null)
+  const [perfilUsuario, setPerfilUsuario] = useState<Perfil | null>(null)
 
   useEffect(() => {
     if (!id) return
@@ -57,28 +58,60 @@ export default function DetallePropiedad() {
     cargarSolicitud()
   }, [id, usuario])
 
+  // Load user profile for auto-fill and gate check
+  useEffect(() => {
+    if (!usuario) return
+    supabase.from('profiles').select('*').eq('id', usuario.id).maybeSingle().then(({ data }) => {
+      if (data) setPerfilUsuario(data as Perfil)
+    })
+  }, [usuario])
+
+  const abrirModalSolicitar = () => {
+    if (!perfilUsuario?.perfil_completo) {
+      navigate(`/perfil?next=/propiedades/${id}`)
+      return
+    }
+    // Auto-fill message pre-populate is done at modal open time
+    setMensajeSolicitud('')
+    setModalAbierto(true)
+  }
+
   const handleSolicitar = async () => {
     if (!usuario || !propiedad) return
     setErrorSolicitud(null)
     setEnviandoSolicitud(true)
+
     const { data, error: sbError } = await supabase
       .from('solicitudes_arriendo')
       .insert({
-        propiedad_id: propiedad.id,
-        inquilino_id: usuario.id,
-        propietario_id: propiedad.publicado_por,
-        mensaje: mensajeSolicitud.trim() || null,
-        inquilino_nombre: usuario.nombre,
+        propiedad_id:    propiedad.id,
+        inquilino_id:    usuario.id,
+        propietario_id:  propiedad.publicado_por,
+        mensaje:         mensajeSolicitud.trim() || null,
+        inquilino_nombre: perfilUsuario?.nombre_completo ?? usuario.nombre,
       })
       .select()
       .single()
+
     if (sbError) {
       setErrorSolicitud(`No se pudo enviar la solicitud: ${sbError.message}`)
-    } else {
-      setSolicitudExistente(data as SolicitudArriendo)
-      setModalAbierto(false)
-      setMensajeSolicitud('')
+      setEnviandoSolicitud(false)
+      return
     }
+
+    const sol = data as SolicitudArriendo
+
+    // Create conversation automatically
+    await supabase.from('conversaciones').upsert({
+      solicitud_id:   sol.id,
+      propiedad_id:   propiedad.id,
+      propietario_id: propiedad.publicado_por,
+      inquilino_id:   usuario.id,
+    }, { onConflict: 'solicitud_id', ignoreDuplicates: true })
+
+    setSolicitudExistente(sol)
+    setModalAbierto(false)
+    setMensajeSolicitud('')
     setEnviandoSolicitud(false)
   }
 
@@ -398,18 +431,30 @@ export default function DetallePropiedad() {
                       Solicitar arrendar esta propiedad
                     </button>
                   ) : solicitudExistente ? (
-                    <div style={{ backgroundColor: '#F0FFF4', border: '1px solid #9AE6B4', borderRadius: '10px', padding: '16px', textAlign: 'center' }}>
-                      <div style={{ fontSize: '22px', marginBottom: '6px' }}>✅</div>
-                      <p style={{ color: '#2D6A4F', fontSize: '13px', fontWeight: 'bold', margin: '0 0 4px' }}>
-                        {SOLICITUD_ESTADO_LABEL[solicitudExistente.estado]}
-                      </p>
-                      <p style={{ color: '#555', fontSize: '12px', margin: 0, lineHeight: '1.5' }}>
-                        El propietario revisará tu solicitud pronto.
-                      </p>
-                    </div>
+                    <>
+                      <div style={{ backgroundColor: '#F0FFF4', border: '1px solid #9AE6B4', borderRadius: '10px', padding: '16px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '22px', marginBottom: '6px' }}>✅</div>
+                        <p style={{ color: '#2D6A4F', fontSize: '13px', fontWeight: 'bold', margin: '0 0 4px' }}>
+                          {SOLICITUD_ESTADO_LABEL[solicitudExistente.estado]}
+                        </p>
+                        <p style={{ color: '#555', fontSize: '12px', margin: 0, lineHeight: '1.5' }}>
+                          El propietario revisará tu solicitud pronto.
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => navigate(`/conversacion/${solicitudExistente.id}`)}
+                        style={{
+                          width: '100%', backgroundColor: 'transparent', color: '#1B3A5C',
+                          border: '1.5px solid #1B3A5C', borderRadius: '10px', padding: '11px',
+                          fontSize: '14px', fontWeight: 'bold', cursor: 'pointer',
+                        }}
+                      >
+                        💬 Mensaje al propietario
+                      </button>
+                    </>
                   ) : (
                     <button
-                      onClick={() => setModalAbierto(true)}
+                      onClick={abrirModalSolicitar}
                       style={{
                         width: '100%', backgroundColor: '#52B788', color: 'white', border: 'none',
                         borderRadius: '10px', padding: '14px', fontSize: '15px', fontWeight: 'bold',
@@ -484,6 +529,19 @@ export default function DetallePropiedad() {
             <p style={{ color: '#666', fontSize: '13px', margin: '0 0 20px' }}>
               {p.titulo} · {p.zona}
             </p>
+
+            {/* Auto-filled contact info */}
+            {perfilUsuario && (
+              <div style={{ backgroundColor: '#F8F9FA', borderRadius: '10px', padding: '12px 14px', marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <p style={{ color: '#555', fontSize: '12px', margin: '0 0 4px', fontWeight: '600' }}>Tu información de contacto</p>
+                <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '13px', color: '#333' }}>👤 {perfilUsuario.nombre_completo ?? usuario?.nombre}</span>
+                  <span style={{ fontSize: '13px', color: '#333' }}>✉️ {usuario?.email}</span>
+                  {perfilUsuario.telefono && <span style={{ fontSize: '13px', color: '#333' }}>📞 {perfilUsuario.telefono}</span>}
+                </div>
+                <a href="/perfil" style={{ fontSize: '11px', color: '#2D6A4F', textDecoration: 'none' }}>Editar perfil →</a>
+              </div>
+            )}
 
             <div style={{ marginBottom: '20px' }}>
               <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#555', marginBottom: '6px' }}>
