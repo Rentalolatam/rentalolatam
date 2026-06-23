@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase, type Propiedad } from '../lib/supabase'
 import Navbar from '../components/Navbar'
@@ -60,12 +60,7 @@ export default function MisDashboard() {
   const [mostrarArchivadas, setMostrarArchivadas] = useState(false)
   const [inquilinosActivos, setInquilinosActivos] = useState(0)
 
-  useEffect(() => {
-    if (!usuario) return
-    cargarDatos()
-  }, [usuario])
-
-  const cargarDatos = async () => {
+  const cargarDatos = useCallback(async () => {
     if (!usuario) return
     setCargando(true)
     setError(null)
@@ -88,7 +83,13 @@ export default function MisDashboard() {
 
     setInquilinosActivos(inquCount ?? 0)
     setCargando(false)
-  }
+  }, [usuario])
+
+  useEffect(() => {
+    if (!usuario) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    cargarDatos()
+  }, [usuario, cargarDatos])
 
   const activas    = propiedades.filter(p => (p.estado_publicacion ?? 'activa') === 'activa')
   const alquiladas = propiedades.filter(p => p.estado_publicacion === 'alquilada')

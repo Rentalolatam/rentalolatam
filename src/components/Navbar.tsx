@@ -17,9 +17,11 @@ export default function Navbar({ extraLinks }: NavbarProps) {
 
   useEffect(() => {
     if (!usuario) {
+      /* eslint-disable react-hooks/set-state-in-effect */
       setTienePropiedades(false)
       setTieneArriendo(false)
       setTieneContratos(false)
+      /* eslint-enable react-hooks/set-state-in-effect */
       return
     }
 

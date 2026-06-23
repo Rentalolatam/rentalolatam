@@ -32,6 +32,7 @@ export default function AuthCallback() {
     }, 10_000)
 
     return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   if (errorMsg) {

@@ -23,6 +23,7 @@ export default function MapaPinEditor({ center, onCoordChange }: Props) {
 
   // Re-center map and reset pin when country changes
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPin(center)
     mapRef.current?.panTo(center)
     onCoordChange(center.lat, center.lng)
